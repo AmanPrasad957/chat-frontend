@@ -10,15 +10,21 @@ import {
   Database,
   ExternalLink,
   Layers,
+  Lock,
+  LogIn,
+  LogOut,
+  Mail,
   MessageSquare,
   Mic,
   MicOff,
   Plus,
   RotateCcw,
   Send,
+  ShieldCheck,
   Sliders,
   Terminal,
   Trash2,
+  User,
   X,
 } from "lucide-react";
 
@@ -66,6 +72,16 @@ export default function AdminChatPage() {
   const [copied, setCopied] = useState(false);
   const [isListening, setIsListening] = useState(false);
 
+  // Authentication & User Account States
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authTab, setAuthTab] = useState("login"); // "login" | "register"
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authFullName, setAuthFullName] = useState("");
+  const [authError, setAuthError] = useState(null);
+  const [authLoading, setAuthLoading] = useState(false);
+
   const recognitionRef = useRef(null);
   const baseInputRef = useRef("");
 
@@ -86,23 +102,117 @@ export default function AdminChatPage() {
     }
   }, [messages, isTyping]);
 
-  // Load backend active threads on mount
+  // Token management helpers
+  function getAccessToken() {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("chat_access_token");
+  }
+
+  function getRefreshToken() {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("chat_refresh_token");
+  }
+
+  function saveTokens(accessToken, refreshToken, user) {
+    if (typeof window === "undefined") return;
+    if (accessToken) localStorage.setItem("chat_access_token", accessToken);
+    if (refreshToken) localStorage.setItem("chat_refresh_token", refreshToken);
+    if (user) {
+      localStorage.setItem("chat_user", JSON.stringify(user));
+      setCurrentUser(user);
+    }
+  }
+
+  function clearSession() {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem("chat_access_token");
+    localStorage.removeItem("chat_refresh_token");
+    localStorage.removeItem("chat_user");
+    setCurrentUser(null);
+  }
+
+  // Authenticated fetch wrapper with automatic token refresh on 401
+  async function authFetch(url, options = {}) {
+    const token = getAccessToken();
+    const headers = {
+      ...(options.headers || {}),
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    let res = await fetch(url, { ...options, headers });
+
+    // Handle token expiration: try refresh once
+    if (res.status === 401 && getRefreshToken()) {
+      try {
+        const refRes = await fetch(`${BACKEND_BASE}/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: getRefreshToken() }),
+        });
+        if (refRes.ok) {
+          const refData = await refRes.json();
+          saveTokens(refData.access_token, refData.refresh_token);
+          headers["Authorization"] = `Bearer ${refData.access_token}`;
+          res = await fetch(url, { ...options, headers });
+        } else {
+          clearSession();
+        }
+      } catch {
+        clearSession();
+      }
+    }
+
+    return res;
+  }
+
+  // Restore authenticated session on mount and load active threads
   useEffect(() => {
-    fetchThreads();
+    const storedUser = localStorage.getItem("chat_user");
+    if (storedUser) {
+      try {
+        setCurrentUser(JSON.parse(storedUser));
+      } catch {}
+    }
+
+    const token = getAccessToken();
+    if (token) {
+      fetch(`${BACKEND_BASE}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((userData) => {
+          if (userData) {
+            setCurrentUser(userData);
+            localStorage.setItem("chat_user", JSON.stringify(userData));
+          }
+          fetchThreads();
+        })
+        .catch(() => {
+          fetchThreads();
+        });
+    } else {
+      fetchThreads();
+    }
   }, []);
 
   async function fetchThreads() {
     try {
-      const res = await fetch(`${BACKEND_BASE}/chat/threads`);
+      const res = await authFetch(`${BACKEND_BASE}/chat/threads`);
       if (res.ok) {
         const data = await res.json();
-        const threads = data.threads || [];
+        const threads = Array.isArray(data) ? data : data.threads || [];
         if (threads.length > 0) {
           const formatted = threads.map((t) => ({
             thread_id: t.thread_id,
             title: t.title || t.thread_id,
           }));
           setActiveThreads(formatted);
+        } else {
+          setActiveThreads([
+            { thread_id: "test-user", title: "Order Status & General Support" }
+          ]);
         }
       }
     } catch (err) {
@@ -110,11 +220,104 @@ export default function AdminChatPage() {
     }
   }
 
+  // Handle user login
+  async function handleLogin(e) {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError(null);
+
+    try {
+      const res = await fetch(`${BACKEND_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: authEmail, password: authPassword }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "Authentication failed. Please check your credentials.");
+      }
+
+      saveTokens(data.access_token, data.refresh_token, data.user);
+      setIsAuthModalOpen(false);
+      setAuthPassword("");
+      await fetchThreads();
+    } catch (err) {
+      setAuthError(err.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  // Handle user registration
+  async function handleRegister(e) {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError(null);
+
+    try {
+      const res = await fetch(`${BACKEND_BASE}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: authEmail,
+          password: authPassword,
+          full_name: authFullName || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "Registration failed.");
+      }
+
+      // Auto login after registration
+      const loginRes = await fetch(`${BACKEND_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: authEmail, password: authPassword }),
+      });
+
+      if (loginRes.ok) {
+        const loginData = await loginRes.json();
+        saveTokens(loginData.access_token, loginData.refresh_token, loginData.user);
+        setIsAuthModalOpen(false);
+        setAuthPassword("");
+        await fetchThreads();
+      } else {
+        setAuthTab("login");
+        setAuthError("Account created successfully! Please sign in.");
+      }
+    } catch (err) {
+      setAuthError(err.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  // Handle user logout
+  async function handleLogout() {
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      try {
+        await fetch(`${BACKEND_BASE}/auth/logout`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+      } catch (err) {
+        console.warn("Logout error:", err);
+      }
+    }
+    clearSession();
+    await fetchThreads();
+  }
+
   // Switch conversation thread
   async function switchChat(threadId) {
     setCurrentThreadId(threadId);
     try {
-      const res = await fetch(`${BACKEND_BASE}/chat/state/${threadId}`);
+      const res = await authFetch(`${BACKEND_BASE}/chat/state/${threadId}`);
       if (res.ok) {
         const state = await res.json();
         const history = state.history || [];
@@ -173,8 +376,9 @@ export default function AdminChatPage() {
   }
 
   function initDefaultChat(id = currentThreadId) {
+    const greetingName = currentUser?.full_name || (currentUser?.email ? currentUser.email.split("@")[0] : "Admin");
     setMessages([
-      { id: `init-1-${id}`, text: "Hi Admin", isUser: false, index: 0 },
+      { id: `init-1-${id}`, text: `Hi ${greetingName}`, isUser: false, index: 0 },
       { id: `init-2-${id}`, text: "What can i do for you ?", isUser: false, index: 1 },
     ]);
     setCurrentState({
@@ -186,7 +390,7 @@ export default function AdminChatPage() {
         context: {},
       },
       bot_message: [
-        { text: "Hi Admin" },
+        { text: `Hi ${greetingName}` },
         { text: "What can i do for you ?" },
       ],
       nlu: {
@@ -198,7 +402,7 @@ export default function AdminChatPage() {
       },
       context: {
         result: {},
-        username: "Admin",
+        username: greetingName,
       },
     });
   }
@@ -218,7 +422,7 @@ export default function AdminChatPage() {
   async function deleteParticularChat(threadId, e) {
     if (e) e.stopPropagation();
     try {
-      await fetch(`${BACKEND_BASE}/chat/threads/${threadId}`, {
+      await authFetch(`${BACKEND_BASE}/chat/threads/${threadId}`, {
         method: "DELETE",
       });
     } catch (err) {
@@ -241,7 +445,7 @@ export default function AdminChatPage() {
   async function deleteParticularMessage(msgObj) {
     if (msgObj.index !== null && msgObj.index !== undefined) {
       try {
-        await fetch(
+        await authFetch(
           `${BACKEND_BASE}/chat/${currentThreadId}/message/${msgObj.index}`,
           { method: "DELETE" }
         );
@@ -255,7 +459,7 @@ export default function AdminChatPage() {
   // Reset current session
   async function resetSession() {
     try {
-      await fetch(`${BACKEND_BASE}/chat/state/${currentThreadId}`, {
+      await authFetch(`${BACKEND_BASE}/chat/state/${currentThreadId}`, {
         method: "DELETE",
       });
     } catch (err) {
@@ -380,18 +584,22 @@ export default function AdminChatPage() {
       })
     );
 
+    const userDisplayName =
+      currentUser?.full_name ||
+      (currentUser?.email ? currentUser.email.split("@")[0] : "Admin");
+
     const payload = {
       text: text,
       thread_id: currentThreadId,
       channel: "rest",
-      context: { username },
+      context: { username: userDisplayName },
     };
 
     const botMsgId = `bot-${Date.now()}`;
     let accumulatedText = "";
 
     try {
-      const res = await fetch(`${BACKEND_BASE}/chat/stream`, {
+      const res = await authFetch(`${BACKEND_BASE}/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -686,6 +894,45 @@ export default function AdminChatPage() {
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>Live at :8000</span>
           </div>
+        </div>
+
+        {/* User Account / Authentication Card */}
+        <div className="pt-3 border-t border-slate-100 px-3">
+          {currentUser ? (
+            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs uppercase flex-shrink-0">
+                  {(currentUser.full_name || currentUser.email || "U")[0]}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-800 truncate">
+                    {currentUser.full_name || currentUser.email.split("@")[0]}
+                  </p>
+                  <span className="text-[10px] text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded font-medium">
+                    {currentUser.role}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-slate-200/60 rounded-lg transition cursor-pointer"
+                title="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                setAuthError(null);
+                setIsAuthModalOpen(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Sign In / Register</span>
+            </button>
+          )}
         </div>
       </aside>
 
@@ -1087,6 +1334,166 @@ export default function AdminChatPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= USER AUTHENTICATION MODAL ================= */}
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-md flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {authTab === "login" ? "Welcome Back" : "Create Account"}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {authTab === "login"
+                      ? "Sign in to access your saved chat threads"
+                      : "Register with email to persist conversation history"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAuthModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Tabs */}
+            <div className="flex border-b border-slate-100">
+              <button
+                onClick={() => {
+                  setAuthTab("login");
+                  setAuthError(null);
+                }}
+                className={`flex-1 py-3 text-xs font-bold transition text-center cursor-pointer border-b-2 ${
+                  authTab === "login"
+                    ? "border-emerald-600 text-emerald-800 bg-emerald-50/40"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => {
+                  setAuthTab("register");
+                  setAuthError(null);
+                }}
+                className={`flex-1 py-3 text-xs font-bold transition text-center cursor-pointer border-b-2 ${
+                  authTab === "register"
+                    ? "border-emerald-600 text-emerald-800 bg-emerald-50/40"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Register
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              {authError && (
+                <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-start gap-2">
+                  <span className="font-bold">•</span>
+                  <span>{authError}</span>
+                </div>
+              )}
+
+              <form onSubmit={authTab === "login" ? handleLogin : handleRegister} className="space-y-4">
+                {authTab === "register" && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Full Name (Optional)
+                    </label>
+                    <div className="relative flex items-center">
+                      <User className="w-4 h-4 text-slate-400 absolute left-3" />
+                      <input
+                        type="text"
+                        value={authFullName}
+                        onChange={(e) => setAuthFullName(e.target.value)}
+                        placeholder="Jane Doe"
+                        className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-slate-800 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Email Address
+                  </label>
+                  <div className="relative flex items-center">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3" />
+                    <input
+                      type="email"
+                      required
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      placeholder="user@example.com"
+                      className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-slate-800 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Password
+                  </label>
+                  <div className="relative flex items-center">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3" />
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-slate-800 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition"
+                    />
+                  </div>
+                  {authTab === "register" && (
+                    <p className="text-[11px] text-slate-400 mt-1">Must be at least 6 characters</p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full mt-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold text-xs transition shadow-sm cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {authLoading && (
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  )}
+                  <span>
+                    {authTab === "login"
+                      ? authLoading ? "Signing in..." : "Sign In"
+                      : authLoading ? "Creating account..." : "Create Account"}
+                  </span>
+                </button>
+              </form>
+
+              <div className="mt-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthTab(authTab === "login" ? "register" : "login");
+                    setAuthError(null);
+                  }}
+                  className="text-xs text-emerald-700 hover:text-emerald-900 font-semibold cursor-pointer"
+                >
+                  {authTab === "login"
+                    ? "Don't have an account? Sign up"
+                    : "Already have an account? Sign in"}
+                </button>
               </div>
             </div>
           </div>
