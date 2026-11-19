@@ -11,6 +11,8 @@ import {
   ExternalLink,
   Layers,
   MessageSquare,
+  Mic,
+  MicOff,
   Plus,
   RotateCcw,
   Send,
@@ -62,6 +64,10 @@ export default function AdminChatPage() {
   const [inputVal, setInputVal] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+
+  const recognitionRef = useRef(null);
+  const baseInputRef = useRef("");
 
   // ChromaDB Knowledge Base Modal States
   const [isKbOpen, setIsKbOpen] = useState(false);
@@ -258,8 +264,91 @@ export default function AdminChatPage() {
     initDefaultChat(currentThreadId);
   }
 
+  // Clean up speech recognition on component unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {}
+      }
+    };
+  }, []);
+
+  // Toggle Voice Input via native Web Speech API
+  function toggleSpeechRecognition() {
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          console.warn("Failed to stop speech recognition:", e);
+        }
+      }
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition =
+      typeof window !== "undefined" &&
+      (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+    if (!SpeechRecognition) {
+      alert(
+        "Voice dictation (Web Speech API) is not supported in this browser. Please try Google Chrome, Microsoft Edge, or Safari."
+      );
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      baseInputRef.current = inputVal ? inputVal.trim() + " " : "";
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event) => {
+        let transcript = "";
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        setInputVal(baseInputRef.current + transcript);
+      };
+
+      recognition.onerror = (event) => {
+        console.warn("Speech recognition error:", event.error);
+        if (event.error === "not-allowed") {
+          alert("Microphone permission was denied. Please allow microphone access in your browser settings.");
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.warn("Error starting speech recognition:", err);
+      setIsListening(false);
+    }
+  }
+
   // Send message to chatbot API
   async function handleSend(textToSend) {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+      setIsListening(false);
+    }
+
     const text = (textToSend || inputVal).trim();
     if (!text) return;
     setInputVal("");
@@ -717,30 +806,70 @@ export default function AdminChatPage() {
               </button>
             </div>
 
-            {/* Chat Input Form */}
+            {/* Chat Input Form with Voice Dictation */}
             <div className="p-4 bg-white border-t border-slate-200">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   handleSend();
                 }}
-                className="flex items-center gap-3"
+                className="flex items-center gap-2.5"
               >
-                <input
-                  type="text"
-                  value={inputVal}
-                  onChange={(e) => setInputVal(e.target.value)}
-                  placeholder="Type your message here"
-                  className="flex-1 bg-white border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 text-sm rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 outline-none transition"
-                />
+                <div className="relative flex-1 flex items-center">
+                  <input
+                    type="text"
+                    value={inputVal}
+                    onChange={(e) => setInputVal(e.target.value)}
+                    placeholder={
+                      isListening
+                        ? "Listening... Speak into your microphone"
+                        : "Type your message or click the mic to speak"
+                    }
+                    className={`w-full bg-white border text-sm rounded-xl pl-4 pr-11 py-3 text-slate-800 placeholder-slate-400 outline-none transition ${
+                      isListening
+                        ? "border-rose-400 ring-2 ring-rose-100 placeholder-rose-400"
+                        : "border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                    }`}
+                  />
+                  {/* Microphone dictation button */}
+                  <button
+                    type="button"
+                    onClick={toggleSpeechRecognition}
+                    className={`absolute right-2 p-1.5 rounded-lg transition cursor-pointer flex items-center justify-center ${
+                      isListening
+                        ? "bg-rose-500 text-white shadow-sm shadow-rose-200 animate-pulse"
+                        : "text-slate-400 hover:text-emerald-700 hover:bg-slate-100"
+                    }`}
+                    title={
+                      isListening
+                        ? "Listening... Click to stop voice dictation"
+                        : "Voice Input (Speech-to-Text)"
+                    }
+                  >
+                    {isListening ? (
+                      <MicOff className="w-4 h-4" />
+                    ) : (
+                      <Mic className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+
                 <button
                   type="submit"
-                  className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold text-sm px-6 py-3 rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer"
+                  className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold text-sm px-6 py-3 rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer flex-shrink-0"
                 >
                   <span>Send</span>
                   <Send className="w-4 h-4" />
                 </button>
               </form>
+
+              {/* Real-time Listening Status Indicator */}
+              {isListening && (
+                <div className="mt-2.5 flex items-center gap-2 text-xs text-rose-600 font-medium px-1 animate-pulse">
+                  <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                  <span>Microphone active &bull; Listening to your voice... Speak clearly</span>
+                </div>
+              )}
             </div>
           </section>
 
