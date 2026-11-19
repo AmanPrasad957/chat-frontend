@@ -387,36 +387,74 @@ export default function AdminChatPage() {
       context: { username },
     };
 
+    const botMsgId = `bot-${Date.now()}`;
+    let accumulatedText = "";
+
     try {
-      const res = await fetch(`${BACKEND_BASE}/chat`, {
+      const res = await fetch(`${BACKEND_BASE}/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      setIsTyping(false);
-
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
 
-      const data = await res.json();
-
-      if (data.bot_message && Array.isArray(data.bot_message)) {
-        const botMsgs = data.bot_message.map((bm, idx) => ({
-          id: `bot-${Date.now()}-${idx}`,
-          text: bm.text || "",
+      // Add bot message bubble for streaming tokens
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: botMsgId,
+          text: "",
           isUser: false,
           index: newMsgIndex + 1,
-        }));
-        setMessages((prev) => [...prev, ...botMsgs]);
+        },
+      ]);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const blocks = buffer.split("\n\n");
+        buffer = blocks.pop() || "";
+
+        for (const block of blocks) {
+          const trimmed = block.trim();
+          if (!trimmed.startsWith("data:")) continue;
+          const jsonStr = trimmed.replace(/^data:\s*/, "");
+          if (!jsonStr) continue;
+
+          try {
+            const ev = JSON.parse(jsonStr);
+            if (ev.type === "token") {
+              accumulatedText += ev.delta || "";
+              setIsTyping(false);
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === botMsgId ? { ...m, text: accumulatedText } : m
+                )
+              );
+            } else if (ev.type === "done") {
+              setIsTyping(false);
+              setCurrentState(ev);
+            }
+          } catch (e) {
+            console.warn("Error parsing SSE block:", e);
+          }
+        }
       }
 
-      setCurrentState(data);
+      setIsTyping(false);
     } catch (err) {
       setIsTyping(false);
       setMessages((prev) => [
-        ...prev,
+        ...prev.filter((m) => m.id !== botMsgId || m.text.trim().length > 0),
         {
           id: `err-${Date.now()}`,
           text: `<span class="text-red-500 font-medium">Error: Could not reach chatbot API (${err.message})</span>`,
