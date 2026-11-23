@@ -712,6 +712,19 @@ export default function AdminChatPage() {
 
       setIsTyping(false);
 
+      if (!accumulatedText.trim()) {
+        const fallbackText =
+          speechLangRef.current === "hi-IN"
+            ? "नमस्ते! मुझे आपका संदेश प्राप्त हुआ। मैं आपकी क्या मदद कर सकता हूँ?"
+            : "Hello! I received your message. How can I assist you?";
+        accumulatedText = fallbackText;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === botMsgId ? { ...m, text: fallbackText } : m
+          )
+        );
+      }
+
       if (isAutoTtsEnabledRef.current && accumulatedText.trim()) {
         speakMessage(accumulatedText, botMsgId);
       }
