@@ -21,12 +21,14 @@ import {
   MessageSquare,
   Mic,
   MicOff,
+  Moon,
   Paperclip,
   Plus,
   RotateCcw,
   Send,
   ShieldCheck,
   Sliders,
+  Sun,
   Terminal,
   Trash2,
   UploadCloud,
@@ -105,6 +107,35 @@ export default function AdminChatPage() {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
   const kbFileInputRef = useRef(null);
+
+  // Theme State (Dark / Light Mode)
+  const [theme, setTheme] = useState("light");
+
+  useEffect(() => {
+    const saved =
+      localStorage.getItem("chat_theme") ||
+      (window.matchMedia &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light");
+    setTheme(saved);
+    if (saved === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, []);
+
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem("chat_theme", next);
+    if (next === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }
 
   const chatContainerRef = useRef(null);
 
@@ -836,16 +867,16 @@ export default function AdminChatPage() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row antialiased bg-[#f8fafc] text-slate-800">
+    <div className="min-h-screen flex flex-col md:flex-row antialiased bg-[#f8fafc] dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors duration-200">
       {/* ================= LEFT SIDEBAR ================= */}
-      <aside className="w-full md:w-64 bg-white border-r border-slate-200 flex-shrink-0 flex flex-col justify-between py-6 px-4">
+      <aside className="w-full md:w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex-shrink-0 flex flex-col justify-between py-6 px-4 transition-colors duration-200">
         <div>
           {/* Brand Logo & Name */}
           <div className="flex items-center gap-3 px-3 mb-6">
-            <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold">
-              <Activity className="w-5 h-5 text-emerald-600" />
+            <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold">
+              <Activity className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-emerald-800">
+            <span className="text-xl font-bold tracking-tight text-emerald-800 dark:text-emerald-400">
               Admin Panel
             </span>
           </div>
@@ -854,30 +885,30 @@ export default function AdminChatPage() {
           <nav className="space-y-1 mb-6">
             <a
               href="#intents"
-              className="flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-slate-600 hover:bg-slate-50 transition font-medium text-sm"
+              className="flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 transition font-medium text-sm"
             >
-              <BrainCircuit className="w-5 h-5 text-emerald-600" />
+              <BrainCircuit className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               Intents
             </a>
             <a
               href="#entities"
-              className="flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-slate-600 hover:bg-slate-50 transition font-medium text-sm"
+              className="flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 transition font-medium text-sm"
             >
-              <Box className="w-5 h-5 text-emerald-600" />
+              <Box className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               Entities
             </a>
             <a
               href="#chat"
-              className="flex items-center gap-3.5 px-3 py-2.5 rounded-xl bg-emerald-50 text-emerald-800 font-semibold text-sm shadow-sm"
+              className="flex items-center gap-3.5 px-3 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 font-semibold text-sm shadow-sm"
             >
-              <MessageSquare className="w-5 h-5 text-emerald-600" />
+              <MessageSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               Chat
             </a>
             <a
               href="#logs"
-              className="flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-slate-600 hover:bg-slate-50 transition font-medium text-sm"
+              className="flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 transition font-medium text-sm"
             >
-              <Terminal className="w-5 h-5 text-emerald-600" />
+              <Terminal className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               Logs
             </a>
           </nav>
@@ -890,7 +921,7 @@ export default function AdminChatPage() {
               </span>
               <button
                 onClick={createNewChat}
-                className="text-[11px] text-emerald-700 hover:text-emerald-900 font-semibold flex items-center gap-1 hover:underline cursor-pointer"
+                className="text-[11px] text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-300 font-semibold flex items-center gap-1 hover:underline cursor-pointer"
                 title="Create a new chat conversation"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -905,8 +936,8 @@ export default function AdminChatPage() {
                     key={t.thread_id}
                     className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition ${
                       isActive
-                        ? "bg-emerald-100/70 text-emerald-900 font-semibold"
-                        : "text-slate-600 hover:bg-slate-100"
+                        ? "bg-emerald-100/70 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 font-semibold"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                     }`}
                   >
                     <div
@@ -929,79 +960,79 @@ export default function AdminChatPage() {
           </div>
 
           {/* Settings Section */}
-          <div className="px-3 mb-2 text-xs font-semibold tracking-wider text-emerald-700/80 uppercase">
+          <div className="px-3 mb-2 text-xs font-semibold tracking-wider text-emerald-700/80 dark:text-emerald-400 uppercase">
             Settings
           </div>
           <nav className="space-y-1">
             <a
               href="#ml"
-              className="flex items-center gap-3.5 px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-50 transition font-medium text-sm"
+              className="flex items-center gap-3.5 px-3 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 transition font-medium text-sm"
             >
-              <Sliders className="w-5 h-5 text-emerald-600" />
+              <Sliders className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               ML Settings
             </a>
 
             <button
               onClick={openKnowledgeModal}
-              className="w-full text-left flex items-center gap-3.5 px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-50 transition font-medium text-sm cursor-pointer"
+              className="w-full text-left flex items-center gap-3.5 px-3 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 transition font-medium text-sm cursor-pointer"
             >
-              <Database className="w-5 h-5 text-emerald-600" />
+              <Database className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               Data Management
-              <span className="ml-auto text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded">
+              <span className="ml-auto text-[10px] bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold px-1.5 py-0.5 rounded border border-transparent dark:border-blue-800">
                 RAG
               </span>
             </button>
 
             <a
               href="#integrations"
-              className="flex items-center gap-3.5 px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-50 transition font-medium text-sm"
+              className="flex items-center gap-3.5 px-3 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 transition font-medium text-sm"
             >
-              <Layers className="w-5 h-5 text-emerald-600" />
+              <Layers className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               Integrations
             </a>
           </nav>
         </div>
 
         {/* Provider & Status Badges */}
-        <div className="pt-4 border-t border-slate-100 px-3 space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-500">
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 px-3 space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
             <span className="font-medium">Backend Engine</span>
-            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold uppercase text-[10px]">
+            <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-semibold uppercase text-[10px] border border-transparent dark:border-emerald-800">
               Google Gemini
             </span>
           </div>
-          <div className="flex items-center justify-between text-xs text-slate-500">
+          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
             <span className="font-medium">Vector Store</span>
-            <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold uppercase text-[10px]">
+            <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-semibold uppercase text-[10px] border border-transparent dark:border-blue-800">
               ChromaDB
             </span>
           </div>
-          <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium pt-1">
+          <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 font-medium pt-1">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>Live at :8000</span>
           </div>
         </div>
 
         {/* User Account / Authentication Card */}
-        <div className="pt-3 border-t border-slate-100 px-3">
+        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 px-3">
           {currentUser ? (
-            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200">
+            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs uppercase flex-shrink-0">
                   {(currentUser.full_name || currentUser.email || "U")[0]}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-slate-800 truncate">
+                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
                     {currentUser.full_name || currentUser.email.split("@")[0]}
                   </p>
-                  <span className="text-[10px] text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded font-medium">
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-950/80 px-1.5 py-0.5 rounded font-medium border border-transparent dark:border-emerald-800">
                     {currentUser.role}
                   </span>
                 </div>
               </div>
               <button
                 onClick={handleLogout}
-                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-slate-200/60 rounded-lg transition cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-lg transition cursor-pointer"
                 title="Sign Out"
               >
                 <LogOut className="w-4 h-4" />
@@ -1028,22 +1059,36 @@ export default function AdminChatPage() {
         <header className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
                 Chat Interface
               </h1>
-              <span className="px-2.5 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-700 text-xs font-mono font-medium">
+              <span className="px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-mono font-medium">
                 {currentThreadId}
               </span>
             </div>
-            <p className="text-slate-500 text-sm mt-1">
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
               Test your chatbot&apos;s responses in real-time
             </p>
           </div>
           <div className="flex items-center gap-2.5">
+            {/* Sleek Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+              title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+            >
+              {theme === "dark" ? (
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+              ) : (
+                <Moon className="w-3.5 h-3.5 text-indigo-600" />
+              )}
+              <span className="capitalize">{theme === "dark" ? "Light" : "Dark"}</span>
+            </button>
+
             {/* Delete Current Chat Button */}
             <button
               onClick={() => deleteParticularChat(currentThreadId)}
-              className="px-3 py-1.5 rounded-lg border border-red-200 bg-red-50/80 hover:bg-red-100 text-red-700 text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/80 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/60 text-red-700 dark:text-red-300 text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
               title="Delete this particular chat"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -1053,7 +1098,7 @@ export default function AdminChatPage() {
             {/* Reset Chat Button */}
             <button
               onClick={resetSession}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 hover:border-slate-400 bg-white text-slate-700 text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
               title="Reset this conversation"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -1064,7 +1109,7 @@ export default function AdminChatPage() {
               href={`${BACKEND_BASE}/docs`}
               target="_blank"
               rel="noreferrer"
-              className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-semibold shadow-xs transition flex items-center gap-1.5 border border-transparent dark:border-slate-700"
             >
               <span>Docs</span>
               <ExternalLink className="w-3.5 h-3.5" />
@@ -1075,7 +1120,7 @@ export default function AdminChatPage() {
         {/* Two Column Grid: Left Chat Panel & Right State Inspector */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-start">
           {/* ================= MIDDLE CHAT INTERFACE ================= */}
-          <section className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/90 shadow-sm flex flex-col h-[700px] overflow-hidden">
+          <section className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm flex flex-col h-[700px] overflow-hidden transition-colors duration-200">
             {/* Conversation Stream */}
             <div
               ref={chatContainerRef}
@@ -1091,7 +1136,7 @@ export default function AdminChatPage() {
                   {m.isUser && (
                     <button
                       onClick={() => deleteParticularMessage(m)}
-                      className="msg-delete-btn opacity-0 transition p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 cursor-pointer"
+                      className="msg-delete-btn opacity-0 transition p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                       title="Delete this message"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -1102,7 +1147,7 @@ export default function AdminChatPage() {
                     className={
                       m.isUser
                         ? "bg-blue-600 text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-sm leading-relaxed shadow-sm"
-                        : "bg-slate-100 text-slate-800 text-sm px-4 py-2.5 rounded-2xl rounded-tl-sm leading-relaxed shadow-sm"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm px-4 py-2.5 rounded-2xl rounded-tl-sm leading-relaxed shadow-sm"
                     }
                     dangerouslySetInnerHTML={{ __html: m.text }}
                   />
@@ -1110,7 +1155,7 @@ export default function AdminChatPage() {
                   {!m.isUser && (
                     <button
                       onClick={() => deleteParticularMessage(m)}
-                      className="msg-delete-btn opacity-0 transition p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 cursor-pointer"
+                      className="msg-delete-btn opacity-0 transition p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                       title="Delete this message"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -1121,7 +1166,7 @@ export default function AdminChatPage() {
 
               {/* Typing indicator */}
               {isTyping && (
-                <div className="flex items-center gap-1.5 bg-slate-100 px-4 py-3 rounded-2xl rounded-tl-sm w-fit">
+                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-4 py-3 rounded-2xl rounded-tl-sm w-fit">
                   <div
                     className="w-2 h-2 rounded-full bg-slate-400 animate-bounce"
                     style={{ animationDelay: "0ms" }}
@@ -1139,21 +1184,21 @@ export default function AdminChatPage() {
             </div>
 
             {/* Quick Test Chips */}
-            <div className="px-5 py-2.5 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            <div className="px-5 py-2.5 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                 Quick Prompts:
               </span>
               <button
                 onClick={() =>
                   handleSend("can you help to find the status of my order")
                 }
-                className="text-xs bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
+                className="text-xs bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
               >
                 📦 &quot;find the status of my order&quot;
               </button>
               <button
                 onClick={() => handleSend("it's ORD987124")}
-                className="text-xs bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
+                className="text-xs bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
               >
                 🔑 &quot;it&apos;s ORD987124&quot;
               </button>
@@ -1163,7 +1208,7 @@ export default function AdminChatPage() {
                     "What is your return policy and refund window?"
                   )
                 }
-                className="text-xs bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
+                className="text-xs bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
               >
                 📚 &quot;Return Policy&quot;
               </button>
@@ -1171,32 +1216,32 @@ export default function AdminChatPage() {
                 onClick={() =>
                   handleSend("How long does standard shipping take?")
                 }
-                className="text-xs bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
+                className="text-xs bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
               >
                 🚚 &quot;Shipping Timeline&quot;
               </button>
             </div>
 
             {/* Chat Input Form with Voice Dictation & Document Upload */}
-            <div className="p-4 bg-white border-t border-slate-200">
+            <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 transition-colors duration-200">
               {/* Document Upload Status Toast */}
               {uploadToast && (
                 <div
                   className={`mb-3 px-3.5 py-2.5 rounded-xl text-xs flex items-center justify-between transition animate-in fade-in duration-150 ${
                     uploadToast.type === "success"
-                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                      ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800"
                       : uploadToast.type === "loading"
-                      ? "bg-blue-50 text-blue-800 border border-blue-200"
-                      : "bg-red-50 text-red-800 border border-red-200"
+                      ? "bg-blue-50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800"
+                      : "bg-red-50 dark:bg-red-950/50 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800"
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     {uploadToast.type === "success" ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
                     ) : uploadToast.type === "loading" ? (
-                      <Loader2 className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
+                      <Loader2 className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin flex-shrink-0" />
                     ) : (
-                      <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                      <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
                     )}
                     <span className="font-medium">{uploadToast.message}</span>
                   </div>
@@ -1204,7 +1249,7 @@ export default function AdminChatPage() {
                     <button
                       type="button"
                       onClick={() => setUploadToast(null)}
-                      className="p-1 hover:bg-black/5 rounded cursor-pointer"
+                      className="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -1224,11 +1269,11 @@ export default function AdminChatPage() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploadingFile}
-                  className="p-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 hover:text-emerald-700 rounded-xl transition cursor-pointer flex items-center justify-center flex-shrink-0 disabled:opacity-50"
+                  className="p-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 active:bg-slate-300 dark:active:bg-slate-650 text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 rounded-xl transition cursor-pointer flex items-center justify-center flex-shrink-0 disabled:opacity-50"
                   title="Upload Document (PDF, TXT, CSV, MD, JSON) for RAG"
                 >
                   {isUploadingFile ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                    <Loader2 className="w-4 h-4 animate-spin text-emerald-600 dark:text-emerald-400" />
                   ) : (
                     <Paperclip className="w-4 h-4" />
                   )}
@@ -1256,10 +1301,10 @@ export default function AdminChatPage() {
                         ? "Listening... Speak into your microphone"
                         : "Type your message or click the mic to speak"
                     }
-                    className={`w-full bg-white border text-sm rounded-xl pl-4 pr-11 py-3 text-slate-800 placeholder-slate-400 outline-none transition ${
+                    className={`w-full bg-white dark:bg-slate-850 border text-sm rounded-xl pl-4 pr-11 py-3 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition ${
                       isListening
-                        ? "border-rose-400 ring-2 ring-rose-100 placeholder-rose-400"
-                        : "border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                        ? "border-rose-400 ring-2 ring-rose-100 dark:ring-rose-950 placeholder-rose-400"
+                        : "border-slate-300 dark:border-slate-700 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-950/60"
                     }`}
                   />
                   {/* Microphone dictation button */}
@@ -1269,7 +1314,7 @@ export default function AdminChatPage() {
                     className={`absolute right-2 p-1.5 rounded-lg transition cursor-pointer flex items-center justify-center ${
                       isListening
                         ? "bg-rose-500 text-white shadow-sm shadow-rose-200 animate-pulse"
-                        : "text-slate-400 hover:text-emerald-700 hover:bg-slate-100"
+                        : "text-slate-400 dark:text-slate-500 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                     }`}
                     title={
                       isListening
@@ -1296,7 +1341,7 @@ export default function AdminChatPage() {
 
               {/* Real-time Listening Status Indicator */}
               {isListening && (
-                <div className="mt-2.5 flex items-center gap-2 text-xs text-rose-600 font-medium px-1 animate-pulse">
+                <div className="mt-2.5 flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 font-medium px-1 animate-pulse">
                   <span className="w-2 h-2 rounded-full bg-rose-500"></span>
                   <span>Microphone active &bull; Listening to your voice... Speak clearly</span>
                 </div>
@@ -1306,27 +1351,27 @@ export default function AdminChatPage() {
 
           {/* ================= RIGHT COLUMN: CURRENT STATE ================= */}
           <section className="lg:col-span-5 flex flex-col h-[700px]">
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm flex-1 flex flex-col overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm flex-1 flex flex-col overflow-hidden transition-colors duration-200">
               {/* State Header */}
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+              <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
                 <div className="flex items-center gap-2.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                  <h2 className="text-base font-bold text-slate-900 tracking-tight">
+                  <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 tracking-tight">
                     Current State
                   </h2>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                  <span className="text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full border border-transparent dark:border-emerald-800">
                     intent: {intentName} ({intentConf}%)
                   </span>
                   <button
                     onClick={copyStateJson}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-100 transition cursor-pointer"
+                    className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                     title="Copy JSON state"
                   >
                     {copied ? (
-                      <Check className="w-4 h-4 text-emerald-600" />
+                      <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                     ) : (
                       <Copy className="w-4 h-4" />
                     )}
@@ -1335,23 +1380,23 @@ export default function AdminChatPage() {
               </div>
 
               {/* JSON State Viewer */}
-              <div className="flex-1 p-5 overflow-auto custom-scrollbar bg-slate-50/70 font-mono text-xs text-slate-800">
-                <pre className="whitespace-pre leading-relaxed select-text font-mono text-[12px] text-slate-800">
+              <div className="flex-1 p-5 overflow-auto custom-scrollbar bg-slate-50/70 dark:bg-slate-950/60 font-mono text-xs text-slate-800 dark:text-slate-200">
+                <pre className="whitespace-pre leading-relaxed select-text font-mono text-[12px] text-slate-800 dark:text-slate-200">
                   {JSON.stringify(currentState, null, 2)}
                 </pre>
               </div>
 
               {/* Bottom Footer Details */}
-              <div className="p-3 bg-white border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 px-5">
+              <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 px-5">
                 <div>
                   Thread:{" "}
-                  <span className="font-semibold text-slate-700">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
                     {currentState?.thread_id || currentThreadId}
                   </span>
                 </div>
                 <div>
                   Channel:{" "}
-                  <span className="font-semibold text-slate-700">rest</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">rest</span>
                 </div>
               </div>
             </div>
@@ -1361,29 +1406,29 @@ export default function AdminChatPage() {
 
       {/* ================= CHROMADB KNOWLEDGE BASE MODAL ================= */}
       {isKbOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
                   <Database className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
                     ChromaDB Vector Store
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Knowledge Base &amp; Retrieval-Augmented Generation (RAG)
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-full border border-blue-200">
+                <span className="text-xs bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 font-semibold px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-900/60">
                   {kbDocs.length} documents
                 </span>
                 <button
                   onClick={() => setIsKbOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                  className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1409,8 +1454,8 @@ export default function AdminChatPage() {
                 onClick={() => kbFileInputRef.current?.click()}
                 className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition ${
                   isDragging
-                    ? "border-emerald-500 bg-emerald-50/60"
-                    : "border-slate-300 hover:border-emerald-400 bg-slate-50/70 hover:bg-emerald-50/20"
+                    ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/30"
+                    : "border-slate-300 dark:border-slate-700 hover:border-emerald-400 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-emerald-50/20 dark:hover:bg-emerald-950/20"
                 }`}
               >
                 <input
@@ -1426,38 +1471,38 @@ export default function AdminChatPage() {
                   className="hidden"
                 />
                 <div className="flex flex-col items-center gap-1.5">
-                  <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                     {isUploadingFile ? (
                       <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
                     ) : (
                       <UploadCloud className="w-5 h-5" />
                     )}
                   </div>
-                  <p className="text-xs font-semibold text-slate-800">
+                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
                     {isUploadingFile
                       ? "Extracting & indexing document into ChromaDB..."
                       : "Drag & drop document here or click to browse"}
                   </p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500">
                     Supports <b>PDF, TXT, Markdown (.md), CSV, JSON</b> (up to 15MB)
                   </p>
                 </div>
               </div>
 
               <div className="relative flex py-1 items-center">
-                <div className="flex-grow border-t border-slate-200"></div>
-                <span className="flex-shrink mx-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+                <span className="flex-shrink mx-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                   or enter text manually
                 </span>
-                <div className="flex-grow border-t border-slate-200"></div>
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
               </div>
 
               {/* Add Document Form */}
               <form
                 onSubmit={handleAddKnowledge}
-                className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3"
+                className="p-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl space-y-3"
               >
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
                   Add Document to Vector Store
                 </span>
                 <div className="grid grid-cols-2 gap-2">
@@ -1466,14 +1511,14 @@ export default function AdminChatPage() {
                     value={kbTitle}
                     onChange={(e) => setKbTitle(e.target.value)}
                     placeholder="Title (e.g. VIP Warranty)"
-                    className="text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-emerald-500"
+                    className="text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-emerald-500"
                   />
                   <input
                     type="text"
                     value={kbCat}
                     onChange={(e) => setKbCat(e.target.value)}
                     placeholder="Category (e.g. warranty)"
-                    className="text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-emerald-500"
+                    className="text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-emerald-500"
                   />
                 </div>
                 <textarea
@@ -1481,7 +1526,7 @@ export default function AdminChatPage() {
                   value={kbText}
                   onChange={(e) => setKbText(e.target.value)}
                   placeholder="Document content to embed into ChromaDB..."
-                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-emerald-500"
+                  className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-emerald-500"
                 ></textarea>
                 <div className="flex justify-end">
                   <button
@@ -1495,7 +1540,7 @@ export default function AdminChatPage() {
 
               {/* Document List */}
               <div>
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block mb-2">
                   Indexed Documents
                 </span>
                 {kbLoading ? (
@@ -1503,7 +1548,7 @@ export default function AdminChatPage() {
                     Loading ChromaDB documents...
                   </div>
                 ) : kbDocs.length === 0 ? (
-                  <div className="text-xs text-slate-400 py-6 text-center">
+                  <div className="text-xs text-slate-400 dark:text-slate-500 py-6 text-center">
                     No documents in ChromaDB collection yet.
                   </div>
                 ) : (
@@ -1511,27 +1556,27 @@ export default function AdminChatPage() {
                     {kbDocs.map((doc) => (
                       <div
                         key={doc.id}
-                        className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-start justify-between gap-3"
+                        className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl flex items-start justify-between gap-3"
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-bold text-slate-800">
+                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
                               {doc.metadata?.title || doc.id}
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-semibold uppercase">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 font-semibold uppercase">
                               {doc.metadata?.category || "general"}
                             </span>
-                            <span className="text-[10px] text-slate-400">
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500">
                               {doc.metadata?.source || ""}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-600 leading-relaxed">
+                          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                             {doc.text}
                           </p>
                         </div>
                         <button
                           onClick={() => deleteKnowledgeDoc(doc.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-slate-200 transition cursor-pointer"
+                          className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
                           title="Delete document"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1548,19 +1593,19 @@ export default function AdminChatPage() {
 
       {/* ================= USER AUTHENTICATION MODAL ================= */}
       {isAuthModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-md flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-md flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
-                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
                     {authTab === "login" ? "Welcome Back" : "Create Account"}
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     {authTab === "login"
                       ? "Sign in to access your saved chat threads"
                       : "Register with email to persist conversation history"}
@@ -1569,14 +1614,14 @@ export default function AdminChatPage() {
               </div>
               <button
                 onClick={() => setIsAuthModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Tabs */}
-            <div className="flex border-b border-slate-100">
+            <div className="flex border-b border-slate-100 dark:border-slate-800">
               <button
                 onClick={() => {
                   setAuthTab("login");
@@ -1584,8 +1629,8 @@ export default function AdminChatPage() {
                 }}
                 className={`flex-1 py-3 text-xs font-bold transition text-center cursor-pointer border-b-2 ${
                   authTab === "login"
-                    ? "border-emerald-600 text-emerald-800 bg-emerald-50/40"
-                    : "border-transparent text-slate-500 hover:text-slate-800"
+                    ? "border-emerald-600 text-emerald-800 dark:text-emerald-400 bg-emerald-50/40 dark:bg-emerald-950/20"
+                    : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
                 }`}
               >
                 Sign In
@@ -1597,8 +1642,8 @@ export default function AdminChatPage() {
                 }}
                 className={`flex-1 py-3 text-xs font-bold transition text-center cursor-pointer border-b-2 ${
                   authTab === "register"
-                    ? "border-emerald-600 text-emerald-800 bg-emerald-50/40"
-                    : "border-transparent text-slate-500 hover:text-slate-800"
+                    ? "border-emerald-600 text-emerald-800 dark:text-emerald-400 bg-emerald-50/40 dark:bg-emerald-950/20"
+                    : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
                 }`}
               >
                 Register
@@ -1608,7 +1653,7 @@ export default function AdminChatPage() {
             {/* Modal Body */}
             <div className="p-6">
               {authError && (
-                <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-start gap-2">
+                <div className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
                   <span className="font-bold">•</span>
                   <span>{authError}</span>
                 </div>
@@ -1617,7 +1662,7 @@ export default function AdminChatPage() {
               <form onSubmit={authTab === "login" ? handleLogin : handleRegister} className="space-y-4">
                 {authTab === "register" && (
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                       Full Name (Optional)
                     </label>
                     <div className="relative flex items-center">
@@ -1627,14 +1672,14 @@ export default function AdminChatPage() {
                         value={authFullName}
                         onChange={(e) => setAuthFullName(e.target.value)}
                         placeholder="Jane Doe"
-                        className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-slate-800 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition"
+                        className="w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900/50 transition"
                       />
                     </div>
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Email Address
                   </label>
                   <div className="relative flex items-center">
@@ -1645,13 +1690,13 @@ export default function AdminChatPage() {
                       value={authEmail}
                       onChange={(e) => setAuthEmail(e.target.value)}
                       placeholder="user@example.com"
-                      className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-slate-800 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition"
+                      className="w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900/50 transition"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                     Password
                   </label>
                   <div className="relative flex items-center">
@@ -1663,11 +1708,11 @@ export default function AdminChatPage() {
                       value={authPassword}
                       onChange={(e) => setAuthPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-slate-800 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition"
+                      className="w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900/50 transition"
                     />
                   </div>
                   {authTab === "register" && (
-                    <p className="text-[11px] text-slate-400 mt-1">Must be at least 6 characters</p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Must be at least 6 characters</p>
                   )}
                 </div>
 
@@ -1694,7 +1739,7 @@ export default function AdminChatPage() {
                     setAuthTab(authTab === "login" ? "register" : "login");
                     setAuthError(null);
                   }}
-                  className="text-xs text-emerald-700 hover:text-emerald-900 font-semibold cursor-pointer"
+                  className="text-xs text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-300 font-semibold cursor-pointer"
                 >
                   {authTab === "login"
                     ? "Don't have an account? Sign up"

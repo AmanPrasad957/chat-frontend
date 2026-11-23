@@ -10,6 +10,11 @@ body {
   color: #1e293b;
 }
 
+html.dark body {
+  background-color: #020617;
+  color: #f8fafc;
+}
+
 code, pre {
   font-family: 'JetBrains Mono', monospace;
 }
@@ -28,8 +33,16 @@ code, pre {
   border-radius: 9999px;
 }
 
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #cbd5e1;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }
 
 .message-group:hover .msg-delete-btn {
