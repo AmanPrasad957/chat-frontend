@@ -7,9 +7,11 @@ import {
   getRefreshToken,
   saveTokens,
   clearSession,
-  authFetch,
   stripHtmlAndMarkdown,
-} from "../lib/api";
+  authApi,
+  chatApi,
+  knowledgeApi,
+} from "../utils/api";
 
 import Sidebar from "../components/Sidebar";
 import ChatArea from "../components/ChatArea";
@@ -248,10 +250,8 @@ export default function AdminChatPage() {
 
     const token = getAccessToken();
     if (token) {
-      fetch(`${BACKEND_BASE}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((r) => (r.ok ? r.json() : null))
+      authApi
+        .getCurrentUser()
         .then((userData) => {
           if (userData) {
             setCurrentUser(userData);
@@ -268,25 +268,17 @@ export default function AdminChatPage() {
   }, []);
 
   async function fetchThreads() {
-    try {
-      const res = await authFetch(`${BACKEND_BASE}/chat/threads`);
-      if (res.ok) {
-        const data = await res.json();
-        const threads = Array.isArray(data) ? data : data.threads || [];
-        if (threads.length > 0) {
-          const formatted = threads.map((t) => ({
-            thread_id: t.thread_id,
-            title: t.title || t.thread_id,
-          }));
-          setActiveThreads(formatted);
-        } else {
-          setActiveThreads([
-            { thread_id: "test-user", title: "Order Status & General Support" },
-          ]);
-        }
-      }
-    } catch (err) {
-      console.warn("Could not fetch threads from backend:", err);
+    const threads = await chatApi.getThreads();
+    if (threads.length > 0) {
+      const formatted = threads.map((t) => ({
+        thread_id: t.thread_id,
+        title: t.title || t.thread_id,
+      }));
+      setActiveThreads(formatted);
+    } else {
+      setActiveThreads([
+        { thread_id: "test-user", title: "Order Status & General Support" },
+      ]);
     }
   }
 
@@ -297,17 +289,7 @@ export default function AdminChatPage() {
     setAuthError(null);
 
     try {
-      const res = await fetch(`${BACKEND_BASE}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: authEmail, password: authPassword }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || "Authentication failed. Please check your credentials.");
-      }
-
+      const data = await authApi.login(authEmail, authPassword);
       saveTokens(data.access_token, data.refresh_token, data.user);
       setIsAuthModalOpen(false);
       setAuthPassword("");
@@ -326,34 +308,16 @@ export default function AdminChatPage() {
     setAuthError(null);
 
     try {
-      const res = await fetch(`${BACKEND_BASE}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: authEmail,
-          password: authPassword,
-          full_name: authFullName || undefined,
-        }),
-      });
+      await authApi.register(authEmail, authPassword, authFullName);
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || "Registration failed.");
-      }
-
-      const loginRes = await fetch(`${BACKEND_BASE}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: authEmail, password: authPassword }),
-      });
-
-      if (loginRes.ok) {
-        const loginData = await loginRes.json();
+      // Auto login after registration
+      try {
+        const loginData = await authApi.login(authEmail, authPassword);
         saveTokens(loginData.access_token, loginData.refresh_token, loginData.user);
         setIsAuthModalOpen(false);
         setAuthPassword("");
         await fetchThreads();
-      } else {
+      } catch {
         setAuthTab("login");
         setAuthError("Account created successfully! Please sign in.");
       }
@@ -368,15 +332,7 @@ export default function AdminChatPage() {
   async function handleLogout() {
     const refreshToken = getRefreshToken();
     if (refreshToken) {
-      try {
-        await fetch(`${BACKEND_BASE}/auth/logout`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh_token: refreshToken }),
-        });
-      } catch (err) {
-        console.warn("Logout error:", err);
-      }
+      await authApi.logout(refreshToken);
     }
     clearSession();
     await fetchThreads();
@@ -386,59 +342,52 @@ export default function AdminChatPage() {
   async function switchChat(threadId) {
     stopSpeaking();
     setCurrentThreadId(threadId);
-    try {
-      const res = await authFetch(`${BACKEND_BASE}/chat/state/${threadId}`);
-      if (res.ok) {
-        const state = await res.json();
-        const history = state.history || [];
-        if (history.length > 0) {
-          const reconstructed = [];
-          history.forEach((turn, idx) => {
-            if (turn.user) {
-              reconstructed.push({
-                id: `msg-u-${idx}`,
-                text: turn.user,
-                isUser: true,
-                index: idx,
-              });
-            }
-            if (turn.bot) {
-              const bMsgs = Array.isArray(turn.bot) ? turn.bot : [turn.bot];
-              bMsgs.forEach((bm, bIdx) => {
-                reconstructed.push({
-                  id: `msg-b-${idx}-${bIdx}`,
-                  text: bm,
-                  isUser: false,
-                  index: idx,
-                });
-              });
-            }
-          });
-          setMessages(reconstructed);
 
-          const lastTurn = history[history.length - 1];
-          setCurrentState({
-            thread_id: threadId,
-            user_message: {
-              thread_id: threadId,
-              text: lastTurn?.user || "",
-              channel: "rest",
-              context: state.context || {},
-            },
-            bot_message: Array.isArray(lastTurn?.bot)
-              ? lastTurn.bot.map((t) => ({ text: t }))
-              : [{ text: String(lastTurn?.bot || "") }],
-            nlu: {
-              entities: {},
-              intent: { intent: "loaded_conversation", confidence: 1.0 },
-            },
-            context: state.context || {},
+    const state = await chatApi.getChatState(threadId);
+    if (state && state.history && state.history.length > 0) {
+      const reconstructed = [];
+      state.history.forEach((turn, idx) => {
+        if (turn.user) {
+          reconstructed.push({
+            id: `msg-u-${idx}`,
+            text: turn.user,
+            isUser: true,
+            index: idx,
           });
-          return;
         }
-      }
-    } catch (e) {
-      console.warn("Error switching chat:", e);
+        if (turn.bot) {
+          const bMsgs = Array.isArray(turn.bot) ? turn.bot : [turn.bot];
+          bMsgs.forEach((bm, bIdx) => {
+            reconstructed.push({
+              id: `msg-b-${idx}-${bIdx}`,
+              text: bm,
+              isUser: false,
+              index: idx,
+            });
+          });
+        }
+      });
+      setMessages(reconstructed);
+
+      const lastTurn = state.history[state.history.length - 1];
+      setCurrentState({
+        thread_id: threadId,
+        user_message: {
+          thread_id: threadId,
+          text: lastTurn?.user || "",
+          channel: "rest",
+          context: state.context || {},
+        },
+        bot_message: Array.isArray(lastTurn?.bot)
+          ? lastTurn.bot.map((t) => ({ text: t }))
+          : [{ text: String(lastTurn?.bot || "") }],
+        nlu: {
+          entities: {},
+          intent: { intent: "loaded_conversation", confidence: 1.0 },
+        },
+        context: state.context || {},
+      });
+      return;
     }
 
     initDefaultChat(threadId);
@@ -491,13 +440,7 @@ export default function AdminChatPage() {
   async function deleteParticularChat(threadId, e) {
     if (e) e.stopPropagation();
     stopSpeaking();
-    try {
-      await authFetch(`${BACKEND_BASE}/chat/threads/${threadId}`, {
-        method: "DELETE",
-      });
-    } catch (err) {
-      console.warn("Failed to delete chat on backend:", err);
-    }
+    await chatApi.deleteThread(threadId);
 
     const updated = activeThreads.filter((t) => t.thread_id !== threadId);
     setActiveThreads(updated);
@@ -516,27 +459,14 @@ export default function AdminChatPage() {
       stopSpeaking();
     }
     if (msgObj.index !== null && msgObj.index !== undefined) {
-      try {
-        await authFetch(
-          `${BACKEND_BASE}/chat/${currentThreadId}/message/${msgObj.index}`,
-          { method: "DELETE" }
-        );
-      } catch (err) {
-        console.warn("Failed to delete message on backend:", err);
-      }
+      await chatApi.deleteMessage(currentThreadId, msgObj.index);
     }
     setMessages((prev) => prev.filter((m) => m.id !== msgObj.id));
   }
 
   async function resetSession() {
     stopSpeaking();
-    try {
-      await authFetch(`${BACKEND_BASE}/chat/state/${currentThreadId}`, {
-        method: "DELETE",
-      });
-    } catch (err) {
-      console.warn("Failed to reset session:", err);
-    }
+    await chatApi.resetSession(currentThreadId);
     initDefaultChat(currentThreadId);
   }
 
@@ -667,15 +597,7 @@ export default function AdminChatPage() {
     let accumulatedText = "";
 
     try {
-      const res = await authFetch(`${BACKEND_BASE}/chat/stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
+      const res = await chatApi.streamChat(payload);
 
       setMessages((prev) => [
         ...prev,
@@ -767,13 +689,8 @@ export default function AdminChatPage() {
   async function loadKnowledgeDocuments() {
     setKbLoading(true);
     try {
-      const res = await fetch(`${BACKEND_BASE}/knowledge`);
-      if (res.ok) {
-        const data = await res.json();
-        setKbDocs(data.documents || []);
-      }
-    } catch (err) {
-      console.warn("Failed to load ChromaDB docs:", err);
+      const docs = await knowledgeApi.getDocuments();
+      setKbDocs(docs);
     } finally {
       setKbLoading(false);
     }
@@ -791,17 +708,11 @@ export default function AdminChatPage() {
     };
 
     try {
-      const res = await fetch(`${BACKEND_BASE}/knowledge`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        setKbTitle("");
-        setKbCat("");
-        setKbText("");
-        await loadKnowledgeDocuments();
-      }
+      await knowledgeApi.addDocument(payload);
+      setKbTitle("");
+      setKbCat("");
+      setKbText("");
+      await loadKnowledgeDocuments();
     } catch (err) {
       alert("Error adding document: " + err.message);
     }
@@ -810,12 +721,8 @@ export default function AdminChatPage() {
   async function deleteKnowledgeDoc(docId) {
     if (!confirm("Delete this document from ChromaDB vector store?")) return;
     try {
-      const res = await fetch(`${BACKEND_BASE}/knowledge/${docId}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        await loadKnowledgeDocuments();
-      }
+      await knowledgeApi.deleteDocument(docId);
+      await loadKnowledgeDocuments();
     } catch (err) {
       alert("Failed to delete document: " + err.message);
     }
@@ -853,15 +760,7 @@ export default function AdminChatPage() {
       formData.append("file", file);
       formData.append("category", "user_documents");
 
-      const res = await authFetch(`${BACKEND_BASE}/knowledge/upload`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || "Failed to upload document.");
-      }
+      const data = await knowledgeApi.uploadFile(formData);
 
       setUploadToast({
         type: "success",
