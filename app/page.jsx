@@ -22,7 +22,7 @@ import AuthModal from "../components/AuthModal";
 export default function AdminChatPage() {
   const [currentThreadId, setCurrentThreadId] = useState("test-user");
   const [activeThreads, setActiveThreads] = useState([
-    { thread_id: "test-user", title: "Order Status & General Support" },
+    { thread_id: "test-user", title: "AI & RAG Assistant" },
   ]);
 
   const [messages, setMessages] = useState([
@@ -277,7 +277,7 @@ export default function AdminChatPage() {
       setActiveThreads(formatted);
     } else {
       setActiveThreads([
-        { thread_id: "test-user", title: "Order Status & General Support" },
+        { thread_id: "test-user", title: "AI & RAG Assistant" },
       ]);
     }
   }

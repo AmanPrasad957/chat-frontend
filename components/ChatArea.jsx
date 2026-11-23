@@ -335,33 +335,35 @@ export default function ChatArea({
           </span>
           <button
             onClick={() =>
-              handleSend("can you help to find the status of my order")
+              handleSend("Summarize the key information from our uploaded knowledge base documents.")
             }
             className="text-xs bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
           >
-            📦 &quot;find the status of my order&quot;
-          </button>
-          <button
-            onClick={() => handleSend("it's ORD987124")}
-            className="text-xs bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
-          >
-            🔑 &quot;it&apos;s ORD987124&quot;
+            📄 &quot;Summarize documents&quot;
           </button>
           <button
             onClick={() =>
-              handleSend("What is your return policy and refund window?")
+              handleSend("What topics and documents are currently indexed in the knowledge base?")
             }
             className="text-xs bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
           >
-            📚 &quot;Return Policy&quot;
+            🔍 &quot;Search knowledge base&quot;
           </button>
           <button
             onClick={() =>
-              handleSend("How long does standard shipping take?")
+              handleSend("Explain how Retrieval-Augmented Generation (RAG) and vector databases work together.")
             }
             className="text-xs bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
           >
-            🚚 &quot;Shipping Timeline&quot;
+            💡 &quot;Explain RAG &amp; Vector Search&quot;
+          </button>
+          <button
+            onClick={() =>
+              handleSend("Write a clean Python function that performs semantic search using vector embeddings.")
+            }
+            className="text-xs bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
+          >
+            💻 &quot;Write Python code&quot;
           </button>
         </div>
 
