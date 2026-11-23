@@ -2,51 +2,23 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import {
-  Activity,
-  AlertCircle,
-  Bot,
-  Box,
-  BrainCircuit,
-  Check,
-  CheckCircle2,
-  Code2,
-  Copy,
-  Database,
-  ExternalLink,
-  FileText,
-  Headphones,
-  Layers,
-  Loader2,
-  Lock,
-  LogIn,
-  LogOut,
-  Mail,
-  MessageSquare,
-  Mic,
-  MicOff,
-  Moon,
-  Paperclip,
-  Plus,
-  RotateCcw,
-  Send,
-  ShieldCheck,
-  Sliders,
-  Sparkles,
-  Sun,
-  Terminal,
-  Trash2,
-  UploadCloud,
-  User,
-  Volume2,
-  VolumeX,
-  X,
-} from "lucide-react";
+  BACKEND_BASE,
+  getAccessToken,
+  getRefreshToken,
+  saveTokens,
+  clearSession,
+  authFetch,
+  stripHtmlAndMarkdown,
+} from "../lib/api";
 
-const BACKEND_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
+import Sidebar from "../components/Sidebar";
+import ChatArea from "../components/ChatArea";
+import StateInspector from "../components/StateInspector";
+import KnowledgeBaseModal from "../components/KnowledgeBaseModal";
+import AuthModal from "../components/AuthModal";
 
 export default function AdminChatPage() {
   const [currentThreadId, setCurrentThreadId] = useState("test-user");
-  const [username] = useState("Admin");
   const [activeThreads, setActiveThreads] = useState([
     { thread_id: "test-user", title: "Order Status & General Support" },
   ]);
@@ -111,10 +83,8 @@ export default function AdminChatPage() {
 
   // Document Upload States
   const [isUploadingFile, setIsUploadingFile] = useState(false);
-  const [uploadToast, setUploadToast] = useState(null); // { type: 'success' | 'error' | 'loading', message: string }
-  const [isDragging, setIsDragging] = useState(false);
+  const [uploadToast, setUploadToast] = useState(null);
   const fileInputRef = useRef(null);
-  const kbFileInputRef = useRef(null);
 
   // Theme State (Dark / Light Mode)
   const [theme, setTheme] = useState("light");
@@ -190,25 +160,6 @@ export default function AdminChatPage() {
     localStorage.setItem("chat_tts_speed", nextRate.toString());
   }
 
-  function stripHtmlAndMarkdown(rawText) {
-    if (!rawText) return "";
-    let clean = rawText;
-    // Strip HTML tags
-    clean = clean.replace(/<[^>]*>/g, " ");
-    // Strip code blocks ```code```
-    clean = clean.replace(/```[\s\S]*?```/g, " code block omitted ");
-    // Strip inline code `code`
-    clean = clean.replace(/`([^`]+)`/g, "$1");
-    // Strip markdown links [label](url)
-    clean = clean.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
-    // Strip bold/italics/headings/blockquotes
-    clean = clean.replace(/[*_~#]/g, "");
-    clean = clean.replace(/^>\s+/gm, "");
-    // Normalize spaces
-    clean = clean.replace(/\s+/g, " ").trim();
-    return clean;
-  }
-
   function stopSpeaking() {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
@@ -222,13 +173,11 @@ export default function AdminChatPage() {
       return;
     }
 
-    // If already speaking this message, toggle off
     if (speakingMsgId === msgId) {
       stopSpeaking();
       return;
     }
 
-    // Cancel any ongoing speech
     window.speechSynthesis.cancel();
 
     const cleanText = stripHtmlAndMarkdown(text);
@@ -238,7 +187,6 @@ export default function AdminChatPage() {
     utterance.rate = speechRateRef.current || 1.0;
     utterance.pitch = 1.0;
 
-    // Pick a natural English voice if available
     const voices = window.speechSynthesis.getVoices();
     const naturalVoice = voices.find(
       (v) =>
@@ -273,7 +221,6 @@ export default function AdminChatPage() {
     window.speechSynthesis.speak(utterance);
   }
 
-  // Cancel speech on unmount
   useEffect(() => {
     return () => {
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -284,77 +231,11 @@ export default function AdminChatPage() {
 
   const chatContainerRef = useRef(null);
 
-  // Auto-scroll chat container to bottom on message or typing change
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages, isTyping]);
-
-  // Token management helpers
-  function getAccessToken() {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("chat_access_token");
-  }
-
-  function getRefreshToken() {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("chat_refresh_token");
-  }
-
-  function saveTokens(accessToken, refreshToken, user) {
-    if (typeof window === "undefined") return;
-    if (accessToken) localStorage.setItem("chat_access_token", accessToken);
-    if (refreshToken) localStorage.setItem("chat_refresh_token", refreshToken);
-    if (user) {
-      localStorage.setItem("chat_user", JSON.stringify(user));
-      setCurrentUser(user);
-    }
-  }
-
-  function clearSession() {
-    if (typeof window === "undefined") return;
-    localStorage.removeItem("chat_access_token");
-    localStorage.removeItem("chat_refresh_token");
-    localStorage.removeItem("chat_user");
-    setCurrentUser(null);
-  }
-
-  // Authenticated fetch wrapper with automatic token refresh on 401
-  async function authFetch(url, options = {}) {
-    const token = getAccessToken();
-    const headers = {
-      ...(options.headers || {}),
-    };
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    let res = await fetch(url, { ...options, headers });
-
-    // Handle token expiration: try refresh once
-    if (res.status === 401 && getRefreshToken()) {
-      try {
-        const refRes = await fetch(`${BACKEND_BASE}/auth/refresh`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh_token: getRefreshToken() }),
-        });
-        if (refRes.ok) {
-          const refData = await refRes.json();
-          saveTokens(refData.access_token, refData.refresh_token);
-          headers["Authorization"] = `Bearer ${refData.access_token}`;
-          res = await fetch(url, { ...options, headers });
-        } else {
-          clearSession();
-        }
-      } catch {
-        clearSession();
-      }
-    }
-
-    return res;
-  }
 
   // Restore authenticated session on mount and load active threads
   useEffect(() => {
@@ -400,7 +281,7 @@ export default function AdminChatPage() {
           setActiveThreads(formatted);
         } else {
           setActiveThreads([
-            { thread_id: "test-user", title: "Order Status & General Support" }
+            { thread_id: "test-user", title: "Order Status & General Support" },
           ]);
         }
       }
@@ -460,7 +341,6 @@ export default function AdminChatPage() {
         throw new Error(data.detail || "Registration failed.");
       }
 
-      // Auto login after registration
       const loginRes = await fetch(`${BACKEND_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -561,12 +441,13 @@ export default function AdminChatPage() {
       console.warn("Error switching chat:", e);
     }
 
-    // Default empty thread
     initDefaultChat(threadId);
   }
 
   function initDefaultChat(id = currentThreadId) {
-    const greetingName = currentUser?.full_name || (currentUser?.email ? currentUser.email.split("@")[0] : "Admin");
+    const greetingName =
+      currentUser?.full_name ||
+      (currentUser?.email ? currentUser.email.split("@")[0] : "Admin");
     setMessages([
       { id: `init-1-${id}`, text: `Hi ${greetingName}`, isUser: false, index: 0 },
       { id: `init-2-${id}`, text: "What can i do for you ?", isUser: false, index: 1 },
@@ -597,7 +478,6 @@ export default function AdminChatPage() {
     });
   }
 
-  // Create brand new conversation
   function createNewChat() {
     const newId = "chat-" + Date.now().toString(36);
     setCurrentThreadId(newId);
@@ -608,7 +488,6 @@ export default function AdminChatPage() {
     initDefaultChat(newId);
   }
 
-  // Delete an entire chat conversation
   async function deleteParticularChat(threadId, e) {
     if (e) e.stopPropagation();
     stopSpeaking();
@@ -632,7 +511,6 @@ export default function AdminChatPage() {
     }
   }
 
-  // Delete an individual message
   async function deleteParticularMessage(msgObj) {
     if (speakingMsgId === msgObj.id) {
       stopSpeaking();
@@ -650,7 +528,6 @@ export default function AdminChatPage() {
     setMessages((prev) => prev.filter((m) => m.id !== msgObj.id));
   }
 
-  // Reset current session
   async function resetSession() {
     stopSpeaking();
     try {
@@ -663,7 +540,6 @@ export default function AdminChatPage() {
     initDefaultChat(currentThreadId);
   }
 
-  // Clean up speech recognition on component unmount
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
@@ -674,7 +550,6 @@ export default function AdminChatPage() {
     };
   }, []);
 
-  // Toggle Voice Input via native Web Speech API
   function toggleSpeechRecognition() {
     if (isListening) {
       if (recognitionRef.current) {
@@ -739,7 +614,6 @@ export default function AdminChatPage() {
     }
   }
 
-  // Send message to chatbot API
   async function handleSend(textToSend) {
     if (recognitionRef.current) {
       try {
@@ -763,7 +637,6 @@ export default function AdminChatPage() {
     setMessages((prev) => [...prev, userMsg]);
     setIsTyping(true);
 
-    // Update title in sidebar if new thread
     setActiveThreads((prev) =>
       prev.map((t) => {
         if (
@@ -804,7 +677,6 @@ export default function AdminChatPage() {
         throw new Error(`HTTP ${res.status}`);
       }
 
-      // Add bot message bubble for streaming tokens
       setMessages((prev) => [
         ...prev,
         {
@@ -855,7 +727,6 @@ export default function AdminChatPage() {
 
       setIsTyping(false);
 
-      // Auto-speak completed assistant response if enabled
       if (isAutoTtsEnabledRef.current && accumulatedText.trim()) {
         speakMessage(accumulatedText, botMsgId);
       }
@@ -873,7 +744,6 @@ export default function AdminChatPage() {
     }
   }
 
-  // Copy state JSON to clipboard
   function copyStateJson() {
     navigator.clipboard.writeText(JSON.stringify(currentState, null, 2)).then(() => {
       setCopied(true);
@@ -881,7 +751,6 @@ export default function AdminChatPage() {
     });
   }
 
-  // Copy assistant message text to clipboard
   function copyMessageText(msgId, text) {
     const clean = (text || "").replace(/<[^>]*>?/gm, "").trim();
     navigator.clipboard.writeText(clean).then(() => {
@@ -890,7 +759,6 @@ export default function AdminChatPage() {
     });
   }
 
-  // ChromaDB Knowledge Base Modal methods
   async function openKnowledgeModal() {
     setIsKbOpen(true);
     await loadKnowledgeDocuments();
@@ -953,7 +821,6 @@ export default function AdminChatPage() {
     }
   }
 
-  // Handle Document Upload (PDF, TXT, CSV, MD, JSON) into ChromaDB
   async function handleFileUpload(file) {
     if (!file) return;
 
@@ -1001,7 +868,6 @@ export default function AdminChatPage() {
         message: `Indexed "${data.filename}" (${data.total_chunks} chunks stored in ChromaDB)!`,
       });
 
-      // Append confirmation system message to the chat
       const confirmationMsg = {
         id: `sys-${Date.now()}`,
         text: `📄 **Document Uploaded:** *${data.filename}* (${data.total_chunks} chunk(s) indexed into ChromaDB vector store). You can now ask questions about this document!`,
@@ -1010,7 +876,6 @@ export default function AdminChatPage() {
       };
       setMessages((prev) => [...prev, confirmationMsg]);
 
-      // If KB modal is open or loaded, refresh document list
       loadKnowledgeDocuments();
 
       setTimeout(() => {
@@ -1026,992 +891,112 @@ export default function AdminChatPage() {
     }
   }
 
-  const intentName = currentState?.nlu?.intent?.intent || "greeting";
-  const intentConf = Math.round(
-    (currentState?.nlu?.intent?.confidence || 0) * 100
+  const currentThreadObj = activeThreads.find(
+    (t) => t.thread_id === currentThreadId
   );
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row antialiased bg-[#f8fafc] dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors duration-200">
-      {/* ================= LEFT SIDEBAR ================= */}
-      <aside className="w-full md:w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex-shrink-0 flex flex-col justify-between py-5 px-4 transition-colors duration-200 md:h-screen md:sticky md:top-0">
-        <div className="flex-1 flex flex-col min-h-0">
-          {/* Brand Logo & Name */}
-          <div className="flex items-center gap-3 px-2 mb-5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 flex-shrink-0">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-sm font-bold tracking-tight text-slate-900 dark:text-slate-100 block leading-tight truncate">
-                Gemini AI RAG
-              </span>
-              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
-                Conversational Agent
-              </span>
-            </div>
-          </div>
+      {/* Sidebar Navigation */}
+      <Sidebar
+        activeThreads={activeThreads}
+        currentThreadId={currentThreadId}
+        switchChat={switchChat}
+        createNewChat={createNewChat}
+        deleteParticularChat={deleteParticularChat}
+        openKnowledgeModal={openKnowledgeModal}
+        kbDocsCount={kbDocs.length}
+        currentUser={currentUser}
+        handleLogout={handleLogout}
+        openAuthModal={() => {
+          setAuthTab("login");
+          setAuthError(null);
+          setIsAuthModalOpen(true);
+        }}
+      />
 
-          {/* New Chat Primary Button */}
-          <button
-            onClick={createNewChat}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-3.5 mb-3 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-medium text-xs shadow-sm transition cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Chat</span>
-          </button>
+      {/* Main Chat Interface */}
+      <ChatArea
+        currentThreadTitle={currentThreadObj?.title || "Chat Interface"}
+        currentThreadId={currentThreadId}
+        isStateInspectorOpen={isStateInspectorOpen}
+        setIsStateInspectorOpen={setIsStateInspectorOpen}
+        isAutoTtsEnabled={isAutoTtsEnabled}
+        toggleAutoTts={toggleAutoTts}
+        speechRate={speechRate}
+        cycleSpeechRate={cycleSpeechRate}
+        theme={theme}
+        toggleTheme={toggleTheme}
+        deleteCurrentChat={() => deleteParticularChat(currentThreadId)}
+        resetSession={resetSession}
+        backendDocsUrl={`${BACKEND_BASE}/docs`}
+        chatContainerRef={chatContainerRef}
+        messages={messages}
+        currentUser={currentUser}
+        deleteParticularMessage={deleteParticularMessage}
+        copyMessageText={copyMessageText}
+        copiedMsgId={copiedMsgId}
+        speakMessage={speakMessage}
+        speakingMsgId={speakingMsgId}
+        isTyping={isTyping}
+        handleSend={handleSend}
+        inputVal={inputVal}
+        setInputVal={setInputVal}
+        fileInputRef={fileInputRef}
+        handleFileUpload={handleFileUpload}
+        isUploadingFile={isUploadingFile}
+        uploadToast={uploadToast}
+        setUploadToast={setUploadToast}
+        isListening={isListening}
+        toggleSpeechRecognition={toggleSpeechRecognition}
+      >
+        {/* Developer State Inspector drawer embedded side-by-side */}
+        <StateInspector
+          isOpen={isStateInspectorOpen}
+          onClose={() => setIsStateInspectorOpen(false)}
+          currentState={currentState}
+          currentThreadId={currentThreadId}
+          copied={copied}
+          copyStateJson={copyStateJson}
+        />
+      </ChatArea>
 
-          {/* Knowledge Base RAG Trigger */}
-          <button
-            onClick={openKnowledgeModal}
-            className="w-full mb-4 flex items-center justify-between px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition font-medium text-xs border border-slate-200/80 dark:border-slate-800 cursor-pointer"
-          >
-            <div className="flex items-center gap-2.5">
-              <Database className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>Knowledge Base</span>
-            </div>
-            <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800">
-              {kbDocs.length > 0 ? `${kbDocs.length} Docs` : "RAG"}
-            </span>
-          </button>
+      {/* ChromaDB Knowledge Base Modal */}
+      <KnowledgeBaseModal
+        isOpen={isKbOpen}
+        onClose={() => setIsKbOpen(false)}
+        kbDocs={kbDocs}
+        kbLoading={kbLoading}
+        kbTitle={kbTitle}
+        setKbTitle={setKbTitle}
+        kbCat={kbCat}
+        setKbCat={setKbCat}
+        kbText={kbText}
+        setKbText={setKbText}
+        handleAddKnowledge={handleAddKnowledge}
+        deleteKnowledgeDoc={deleteKnowledgeDoc}
+        handleFileUpload={handleFileUpload}
+        isUploadingFile={isUploadingFile}
+      />
 
-          {/* Active Conversations Section */}
-          <div className="flex-1 flex flex-col min-h-0 mb-3">
-            <div className="px-2 mb-2 flex items-center justify-between">
-              <span className="text-[11px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
-                Conversations
-              </span>
-              <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
-                {activeThreads.length}
-              </span>
-            </div>
-            <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar pr-1">
-              {activeThreads.map((t) => {
-                const isActive = t.thread_id === currentThreadId;
-                return (
-                  <div
-                    key={t.thread_id}
-                    className={`group flex items-center justify-between px-2.5 py-2 rounded-xl text-xs cursor-pointer transition ${
-                      isActive
-                        ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 font-semibold border border-emerald-200/80 dark:border-emerald-800/60"
-                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200"
-                    }`}
-                  >
-                    <div
-                      className="truncate flex-1 pr-2 flex items-center gap-2"
-                      onClick={() => switchChat(t.thread_id)}
-                    >
-                      <MessageSquare className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`} />
-                      <span className="truncate">{t.title || t.thread_id}</span>
-                    </div>
-                    <button
-                      onClick={(e) => deleteParticularChat(t.thread_id, e)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-600 rounded transition cursor-pointer"
-                      title="Delete this chat"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        <div>
-          {/* Provider & Status Badges */}
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 px-2 space-y-1.5">
-            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-              <span className="font-medium">Backend Engine</span>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-semibold uppercase text-[10px] border border-transparent dark:border-emerald-800">
-                Gemini 2.0
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-              <span className="font-medium">Vector Store</span>
-              <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-semibold uppercase text-[10px] border border-transparent dark:border-blue-800">
-                ChromaDB
-              </span>
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium pt-0.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>FastAPI Connected</span>
-            </div>
-          </div>
-
-          {/* User Account / Authentication Card */}
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 px-2">
-            {currentUser ? (
-              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs uppercase flex-shrink-0">
-                    {(currentUser.full_name || currentUser.email || "U")[0]}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-                      {currentUser.full_name || currentUser.email.split("@")[0]}
-                    </p>
-                    <span className="text-[10px] text-emerald-700 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-950/80 px-1.5 py-0.5 rounded font-medium border border-transparent dark:border-emerald-800">
-                      {currentUser.role}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-lg transition cursor-pointer"
-                  title="Sign Out"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => {
-                  setAuthError(null);
-                  setIsAuthModalOpen(true);
-                }}
-                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Sign In / Register</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </aside>
-
-      {/* ================= MAIN WORKSPACE AREA ================= */}
-      <main className="flex-1 flex flex-col p-4 md:p-6 lg:p-8 overflow-y-auto">
-        {/* Top Header */}
-        <header className="mb-4 md:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 truncate max-w-md">
-                {activeThreads.find((t) => t.thread_id === currentThreadId)?.title || "Chat Interface"}
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-[11px] font-semibold flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                Gemini 2.0 Flash
-              </span>
-            </div>
-            <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-mono">
-              Thread: {currentThreadId}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* State Inspector Toggle Button */}
-            <button
-              onClick={() => setIsStateInspectorOpen(!isStateInspectorOpen)}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer ${
-                isStateInspectorOpen
-                  ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"
-                  : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
-              }`}
-              title="Toggle State Inspector drawer"
-            >
-              <Code2 className="w-3.5 h-3.5" />
-              <span>{isStateInspectorOpen ? "Hide Inspector" : "{ } Inspect State"}</span>
-            </button>
-
-            {/* Auto-Speak / Hands-Free Voice Button */}
-            <button
-              onClick={toggleAutoTts}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer ${
-                isAutoTtsEnabled
-                  ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"
-                  : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
-              }`}
-              title={
-                isAutoTtsEnabled
-                  ? "Auto-Speak enabled: bot speaks responses automatically (click to turn OFF)"
-                  : "Auto-Speak disabled: click to automatically read out bot responses"
-              }
-            >
-              <Headphones
-                className={`w-3.5 h-3.5 ${
-                  isAutoTtsEnabled
-                    ? "text-emerald-600 dark:text-emerald-400 animate-pulse"
-                    : "text-slate-400"
-                }`}
-              />
-              <span>Auto-Speak: {isAutoTtsEnabled ? "ON" : "OFF"}</span>
-            </button>
-
-            {/* Voice Speed Cycle Button */}
-            <button
-              onClick={cycleSpeechRate}
-              className="px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-mono font-semibold shadow-xs transition flex items-center gap-1 cursor-pointer"
-              title="Click to cycle voice playback speed (1x, 1.25x, 1.5x, 0.75x)"
-            >
-              <Volume2 className="w-3.5 h-3.5 text-slate-500" />
-              <span>{speechRate}x</span>
-            </button>
-
-            {/* Sleek Theme Toggle Button */}
-            <button
-              onClick={toggleTheme}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-              title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
-            >
-              {theme === "dark" ? (
-                <Sun className="w-3.5 h-3.5 text-amber-400" />
-              ) : (
-                <Moon className="w-3.5 h-3.5 text-indigo-600" />
-              )}
-              <span className="capitalize">{theme === "dark" ? "Light" : "Dark"}</span>
-            </button>
-
-            {/* Delete Current Chat Button */}
-            <button
-              onClick={() => deleteParticularChat(currentThreadId)}
-              className="px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/60 bg-red-50/80 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/60 text-red-700 dark:text-red-300 text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-              title="Delete this particular chat"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Delete Chat</span>
-            </button>
-
-            {/* Reset Chat Button */}
-            <button
-              onClick={resetSession}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-              title="Reset this conversation"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Reset</span>
-            </button>
-
-            <a
-              href={`${BACKEND_BASE}/docs`}
-              target="_blank"
-              rel="noreferrer"
-              className="px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-semibold shadow-xs transition flex items-center gap-1.5 border border-transparent dark:border-slate-700"
-            >
-              <span>Docs</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
-        </header>
-
-        {/* Content Area: Main Chat + Collapsible Inspector */}
-        <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0 items-start">
-          {/* ================= MIDDLE CHAT INTERFACE ================= */}
-          <section className="flex-1 w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm flex flex-col h-[calc(100vh-140px)] min-h-[620px] overflow-hidden transition-colors duration-200">
-            {/* Conversation Stream */}
-            <div
-              ref={chatContainerRef}
-              className="flex-1 p-4 md:p-6 overflow-y-auto space-y-5 custom-scrollbar"
-            >
-              <div className="max-w-3xl mx-auto w-full space-y-5">
-                {messages.map((m) => (
-                  <div key={m.id} className="w-full">
-                    {m.isUser ? (
-                      /* User Message Bubble */
-                      <div className="flex items-start justify-end gap-3 max-w-[85%] ml-auto group">
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition self-center">
-                          <button
-                            onClick={() => deleteParticularMessage(m)}
-                            className="p-1.5 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                            title="Delete this message"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        <div className="flex flex-col items-end">
-                          <div
-                            className="bg-emerald-600 text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-sm leading-relaxed shadow-sm selection:bg-emerald-700"
-                            dangerouslySetInnerHTML={{ __html: m.text }}
-                          />
-                        </div>
-                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-200 flex-shrink-0 uppercase shadow-xs">
-                          {(currentUser?.full_name || currentUser?.email || "U")[0]}
-                        </div>
-                      </div>
-                    ) : (
-                      /* Assistant Message Bubble */
-                      <div className="flex items-start justify-start gap-3 max-w-[88%] mr-auto group">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white flex-shrink-0 shadow-sm mt-0.5">
-                          <Sparkles className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0 flex flex-col">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                              Gemini Assistant
-                            </span>
-                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.2 rounded font-mono font-medium">
-                              AI
-                            </span>
-                          </div>
-                          <div
-                            className="bg-slate-100/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 text-sm px-4 py-3 rounded-2xl rounded-tl-sm leading-relaxed shadow-xs"
-                            dangerouslySetInnerHTML={{ __html: m.text }}
-                          />
-                          {/* Actions: Copy, Listen, Delete */}
-                          <div className="flex items-center gap-2 mt-1.5 opacity-70 group-hover:opacity-100 transition text-slate-400 dark:text-slate-500 pl-1">
-                            <button
-                              onClick={() => copyMessageText(m.id, m.text)}
-                              className="hover:text-slate-800 dark:hover:text-slate-200 transition cursor-pointer flex items-center gap-1 text-[11px]"
-                              title="Copy message"
-                            >
-                              {copiedMsgId === m.id ? (
-                                <>
-                                  <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">Copied!</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-3.5 h-3.5" />
-                                  <span>Copy</span>
-                                </>
-                              )}
-                            </button>
-
-                            <span className="text-slate-300 dark:text-slate-700">&bull;</span>
-
-                            <button
-                              onClick={() => speakMessage(m.text, m.id)}
-                              className={`transition cursor-pointer flex items-center gap-1 text-[11px] ${
-                                speakingMsgId === m.id
-                                  ? "text-emerald-600 dark:text-emerald-400 font-medium animate-pulse"
-                                  : "hover:text-emerald-600 dark:hover:text-emerald-400"
-                              }`}
-                              title={
-                                speakingMsgId === m.id
-                                  ? "Stop reading aloud"
-                                  : "Read aloud (Text-to-Speech)"
-                              }
-                            >
-                              {speakingMsgId === m.id ? (
-                                <>
-                                  <VolumeX className="w-3.5 h-3.5" />
-                                  <span>Stop</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Volume2 className="w-3.5 h-3.5" />
-                                  <span>Listen</span>
-                                </>
-                              )}
-                            </button>
-
-                            <span className="text-slate-300 dark:text-slate-700">&bull;</span>
-
-                            <button
-                              onClick={() => deleteParticularMessage(m)}
-                              className="hover:text-red-500 transition cursor-pointer flex items-center gap-1 text-[11px]"
-                              title="Delete this message"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {/* Typing indicator */}
-                {isTyping && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white flex-shrink-0 shadow-sm">
-                      <Sparkles className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-4 py-3 rounded-2xl rounded-tl-sm w-fit">
-                      <div
-                        className="w-2 h-2 rounded-full bg-emerald-500 animate-bounce"
-                        style={{ animationDelay: "0ms" }}
-                      />
-                      <div
-                        className="w-2 h-2 rounded-full bg-emerald-500 animate-bounce"
-                        style={{ animationDelay: "150ms" }}
-                      />
-                      <div
-                        className="w-2 h-2 rounded-full bg-emerald-500 animate-bounce"
-                        style={{ animationDelay: "300ms" }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Quick Test Chips */}
-            <div className="px-5 py-2.5 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-center gap-2">
-              <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                Quick Prompts:
-              </span>
-              <button
-                onClick={() =>
-                  handleSend("can you help to find the status of my order")
-                }
-                className="text-xs bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
-              >
-                📦 &quot;find the status of my order&quot;
-              </button>
-              <button
-                onClick={() => handleSend("it's ORD987124")}
-                className="text-xs bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
-              >
-                🔑 &quot;it&apos;s ORD987124&quot;
-              </button>
-              <button
-                onClick={() =>
-                  handleSend(
-                    "What is your return policy and refund window?"
-                  )
-                }
-                className="text-xs bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
-              >
-                📚 &quot;Return Policy&quot;
-              </button>
-              <button
-                onClick={() =>
-                  handleSend("How long does standard shipping take?")
-                }
-                className="text-xs bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700 px-2.5 py-1 rounded-full transition font-medium cursor-pointer"
-              >
-                🚚 &quot;Shipping Timeline&quot;
-              </button>
-            </div>
-
-            {/* Chat Input Form with Voice Dictation & Document Upload */}
-            <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 transition-colors duration-200">
-              <div className="max-w-3xl mx-auto w-full">
-                {/* Document Upload Status Toast */}
-                {uploadToast && (
-                  <div
-                    className={`mb-3 px-3.5 py-2.5 rounded-xl text-xs flex items-center justify-between transition animate-in fade-in duration-150 ${
-                      uploadToast.type === "success"
-                        ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800"
-                        : uploadToast.type === "loading"
-                        ? "bg-blue-50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800"
-                        : "bg-red-50 dark:bg-red-950/50 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      {uploadToast.type === "success" ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                      ) : uploadToast.type === "loading" ? (
-                        <Loader2 className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin flex-shrink-0" />
-                      ) : (
-                        <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
-                      )}
-                      <span className="font-medium">{uploadToast.message}</span>
-                    </div>
-                    {uploadToast.type !== "loading" && (
-                      <button
-                        type="button"
-                        onClick={() => setUploadToast(null)}
-                        className="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSend();
-                  }}
-                  className="flex items-center gap-2.5"
-                >
-                  {/* Paperclip Document Upload Button */}
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploadingFile}
-                    className="p-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 active:bg-slate-300 dark:active:bg-slate-650 text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 rounded-xl transition cursor-pointer flex items-center justify-center flex-shrink-0 disabled:opacity-50"
-                    title="Upload Document (PDF, TXT, CSV, MD, JSON) for RAG"
-                  >
-                    {isUploadingFile ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-emerald-600 dark:text-emerald-400" />
-                    ) : (
-                      <Paperclip className="w-4 h-4" />
-                    )}
-                  </button>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    accept=".pdf,.txt,.md,.csv,.json"
-                    onChange={(e) => {
-                      if (e.target.files?.[0]) {
-                        handleFileUpload(e.target.files[0]);
-                        e.target.value = "";
-                      }
-                    }}
-                    className="hidden"
-                  />
-
-                  <div className="relative flex-1 flex items-center">
-                    <input
-                      type="text"
-                      value={inputVal}
-                      onChange={(e) => setInputVal(e.target.value)}
-                      placeholder={
-                        isListening
-                          ? "Listening... Speak into your microphone"
-                          : "Type your message or click the mic to speak..."
-                      }
-                      className={`w-full bg-white dark:bg-slate-850 border text-sm rounded-xl pl-4 pr-11 py-3 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition ${
-                        isListening
-                          ? "border-rose-400 ring-2 ring-rose-100 dark:ring-rose-950 placeholder-rose-400"
-                          : "border-slate-300 dark:border-slate-700 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-950/60"
-                      }`}
-                    />
-                    {/* Microphone dictation button */}
-                    <button
-                      type="button"
-                      onClick={toggleSpeechRecognition}
-                      className={`absolute right-2 p-1.5 rounded-lg transition cursor-pointer flex items-center justify-center ${
-                        isListening
-                          ? "bg-rose-500 text-white shadow-sm shadow-rose-200 animate-pulse"
-                          : "text-slate-400 dark:text-slate-500 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                      }`}
-                      title={
-                        isListening
-                          ? "Listening... Click to stop voice dictation"
-                          : "Voice Input (Speech-to-Text)"
-                      }
-                    >
-                      {isListening ? (
-                        <MicOff className="w-4 h-4" />
-                      ) : (
-                        <Mic className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold text-sm px-6 py-3 rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer flex-shrink-0"
-                  >
-                    <span>Send</span>
-                    <Send className="w-4 h-4" />
-                  </button>
-                </form>
-
-                {/* Real-time Listening Status Indicator */}
-                {isListening && (
-                  <div className="mt-2.5 flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 font-medium px-1 animate-pulse">
-                    <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                    <span>Microphone active &bull; Listening to your voice... Speak clearly</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-
-          {/* ================= STATE INSPECTOR DRAWER / PANEL ================= */}
-          {isStateInspectorOpen && (
-            <section className="w-full lg:w-[420px] flex-shrink-0 flex flex-col h-[calc(100vh-140px)] min-h-[620px] transition-all duration-200 animate-in slide-in-from-right-4">
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm flex-1 flex flex-col overflow-hidden transition-colors duration-200">
-                {/* State Header */}
-                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
-                  <div className="flex items-center gap-2.5">
-                    <Code2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-                      State Inspector
-                    </h2>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full border border-transparent dark:border-emerald-800">
-                      {intentName} ({intentConf}%)
-                    </span>
-                    <button
-                      onClick={copyStateJson}
-                      className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                      title="Copy JSON state"
-                    >
-                      {copied ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => setIsStateInspectorOpen(false)}
-                      className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                      title="Close Inspector"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* JSON State Viewer */}
-                <div className="flex-1 p-4 overflow-auto custom-scrollbar bg-slate-50/70 dark:bg-slate-950/60 font-mono text-xs text-slate-800 dark:text-slate-200">
-                  <pre className="whitespace-pre leading-relaxed select-text font-mono text-[11px] text-slate-800 dark:text-slate-200">
-                    {JSON.stringify(currentState, null, 2)}
-                  </pre>
-                </div>
-
-                {/* Bottom Footer Details */}
-                <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 px-5">
-                  <div>
-                    Thread:{" "}
-                    <span className="font-semibold text-slate-700 dark:text-slate-300">
-                      {currentState?.thread_id || currentThreadId}
-                    </span>
-                  </div>
-                  <div>
-                    Channel:{" "}
-                    <span className="font-semibold text-slate-700 dark:text-slate-300">rest</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
-        </div>
-      </main>
-
-      {/* ================= CHROMADB KNOWLEDGE BASE MODAL ================= */}
-      {isKbOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
-                  <Database className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    ChromaDB Vector Store
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Knowledge Base &amp; Retrieval-Augmented Generation (RAG)
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 font-semibold px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-900/60">
-                  {kbDocs.length} documents
-                </span>
-                <button
-                  onClick={() => setIsKbOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
-              {/* Drag & Drop File Upload Zone */}
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDragging(true);
-                }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setIsDragging(false);
-                  if (e.dataTransfer.files?.[0]) {
-                    handleFileUpload(e.dataTransfer.files[0]);
-                  }
-                }}
-                onClick={() => kbFileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition ${
-                  isDragging
-                    ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/30"
-                    : "border-slate-300 dark:border-slate-700 hover:border-emerald-400 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-emerald-50/20 dark:hover:bg-emerald-950/20"
-                }`}
-              >
-                <input
-                  type="file"
-                  ref={kbFileInputRef}
-                  accept=".pdf,.txt,.md,.csv,.json"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) {
-                      handleFileUpload(e.target.files[0]);
-                      e.target.value = "";
-                    }
-                  }}
-                  className="hidden"
-                />
-                <div className="flex flex-col items-center gap-1.5">
-                  <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                    {isUploadingFile ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
-                    ) : (
-                      <UploadCloud className="w-5 h-5" />
-                    )}
-                  </div>
-                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                    {isUploadingFile
-                      ? "Extracting & indexing document into ChromaDB..."
-                      : "Drag & drop document here or click to browse"}
-                  </p>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                    Supports <b>PDF, TXT, Markdown (.md), CSV, JSON</b> (up to 15MB)
-                  </p>
-                </div>
-              </div>
-
-              <div className="relative flex py-1 items-center">
-                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-                <span className="flex-shrink mx-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                  or enter text manually
-                </span>
-                <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-              </div>
-
-              {/* Add Document Form */}
-              <form
-                onSubmit={handleAddKnowledge}
-                className="p-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl space-y-3"
-              >
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
-                  Add Document to Vector Store
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    value={kbTitle}
-                    onChange={(e) => setKbTitle(e.target.value)}
-                    placeholder="Title (e.g. VIP Warranty)"
-                    className="text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-emerald-500"
-                  />
-                  <input
-                    type="text"
-                    value={kbCat}
-                    onChange={(e) => setKbCat(e.target.value)}
-                    placeholder="Category (e.g. warranty)"
-                    className="text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-emerald-500"
-                  />
-                </div>
-                <textarea
-                  rows={2}
-                  value={kbText}
-                  onChange={(e) => setKbText(e.target.value)}
-                  placeholder="Document content to embed into ChromaDB..."
-                  className="w-full text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-emerald-500"
-                ></textarea>
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-4 py-2 rounded-lg transition shadow-xs cursor-pointer"
-                  >
-                    Index into ChromaDB
-                  </button>
-                </div>
-              </form>
-
-              {/* Document List */}
-              <div>
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block mb-2">
-                  Indexed Documents
-                </span>
-                {kbLoading ? (
-                  <div className="text-xs text-slate-500 py-4 text-center">
-                    Loading ChromaDB documents...
-                  </div>
-                ) : kbDocs.length === 0 ? (
-                  <div className="text-xs text-slate-400 dark:text-slate-500 py-6 text-center">
-                    No documents in ChromaDB collection yet.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {kbDocs.map((doc) => (
-                      <div
-                        key={doc.id}
-                        className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl flex items-start justify-between gap-3"
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                              {doc.metadata?.title || doc.id}
-                            </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 font-semibold uppercase">
-                              {doc.metadata?.category || "general"}
-                            </span>
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                              {doc.metadata?.source || ""}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                            {doc.text}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => deleteKnowledgeDoc(doc.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
-                          title="Delete document"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ================= USER AUTHENTICATION MODAL ================= */}
-      {isAuthModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-md flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
-                  <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    {authTab === "login" ? "Welcome Back" : "Create Account"}
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {authTab === "login"
-                      ? "Sign in to access your saved chat threads"
-                      : "Register with email to persist conversation history"}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsAuthModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Tabs */}
-            <div className="flex border-b border-slate-100 dark:border-slate-800">
-              <button
-                onClick={() => {
-                  setAuthTab("login");
-                  setAuthError(null);
-                }}
-                className={`flex-1 py-3 text-xs font-bold transition text-center cursor-pointer border-b-2 ${
-                  authTab === "login"
-                    ? "border-emerald-600 text-emerald-800 dark:text-emerald-400 bg-emerald-50/40 dark:bg-emerald-950/20"
-                    : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
-                }`}
-              >
-                Sign In
-              </button>
-              <button
-                onClick={() => {
-                  setAuthTab("register");
-                  setAuthError(null);
-                }}
-                className={`flex-1 py-3 text-xs font-bold transition text-center cursor-pointer border-b-2 ${
-                  authTab === "register"
-                    ? "border-emerald-600 text-emerald-800 dark:text-emerald-400 bg-emerald-50/40 dark:bg-emerald-950/20"
-                    : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
-                }`}
-              >
-                Register
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6">
-              {authError && (
-                <div className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
-                  <span className="font-bold">•</span>
-                  <span>{authError}</span>
-                </div>
-              )}
-
-              <form onSubmit={authTab === "login" ? handleLogin : handleRegister} className="space-y-4">
-                {authTab === "register" && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Full Name (Optional)
-                    </label>
-                    <div className="relative flex items-center">
-                      <User className="w-4 h-4 text-slate-400 absolute left-3" />
-                      <input
-                        type="text"
-                        value={authFullName}
-                        onChange={(e) => setAuthFullName(e.target.value)}
-                        placeholder="Jane Doe"
-                        className="w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900/50 transition"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Email Address
-                  </label>
-                  <div className="relative flex items-center">
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3" />
-                    <input
-                      type="email"
-                      required
-                      value={authEmail}
-                      onChange={(e) => setAuthEmail(e.target.value)}
-                      placeholder="user@example.com"
-                      className="w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900/50 transition"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Password
-                  </label>
-                  <div className="relative flex items-center">
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3" />
-                    <input
-                      type="password"
-                      required
-                      minLength={6}
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:bg-white dark:focus:bg-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-900/50 transition"
-                    />
-                  </div>
-                  {authTab === "register" && (
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Must be at least 6 characters</p>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full mt-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold text-xs transition shadow-sm cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
-                >
-                  {authLoading && (
-                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  )}
-                  <span>
-                    {authTab === "login"
-                      ? authLoading ? "Signing in..." : "Sign In"
-                      : authLoading ? "Creating account..." : "Create Account"}
-                  </span>
-                </button>
-              </form>
-
-              <div className="mt-4 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthTab(authTab === "login" ? "register" : "login");
-                    setAuthError(null);
-                  }}
-                  className="text-xs text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-300 font-semibold cursor-pointer"
-                >
-                  {authTab === "login"
-                    ? "Don't have an account? Sign up"
-                    : "Already have an account? Sign in"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Authentication & User Account Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        authTab={authTab}
+        setAuthTab={setAuthTab}
+        authEmail={authEmail}
+        setAuthEmail={setAuthEmail}
+        authPassword={authPassword}
+        setAuthPassword={setAuthPassword}
+        authFullName={authFullName}
+        setAuthFullName={setAuthFullName}
+        authError={authError}
+        setAuthError={setAuthError}
+        authLoading={authLoading}
+        handleLogin={handleLogin}
+        handleRegister={handleRegister}
+      />
     </div>
   );
 }
