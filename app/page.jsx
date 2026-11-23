@@ -291,6 +291,9 @@ export default function AdminChatPage() {
     try {
       const data = await authApi.login(authEmail, authPassword);
       saveTokens(data.access_token, data.refresh_token, data.user);
+      if (data.user) {
+        setCurrentUser(data.user);
+      }
       setIsAuthModalOpen(false);
       setAuthPassword("");
       await fetchThreads();
@@ -314,6 +317,9 @@ export default function AdminChatPage() {
       try {
         const loginData = await authApi.login(authEmail, authPassword);
         saveTokens(loginData.access_token, loginData.refresh_token, loginData.user);
+        if (loginData.user) {
+          setCurrentUser(loginData.user);
+        }
         setIsAuthModalOpen(false);
         setAuthPassword("");
         await fetchThreads();
@@ -335,6 +341,7 @@ export default function AdminChatPage() {
       await authApi.logout(refreshToken);
     }
     clearSession();
+    setCurrentUser(null);
     await fetchThreads();
   }
 
@@ -848,6 +855,12 @@ export default function AdminChatPage() {
         setUploadToast={setUploadToast}
         isListening={isListening}
         toggleSpeechRecognition={toggleSpeechRecognition}
+        openAuthModal={() => {
+          setAuthTab("login");
+          setAuthError(null);
+          setIsAuthModalOpen(true);
+        }}
+        handleLogout={handleLogout}
       >
         {/* Developer State Inspector drawer embedded side-by-side */}
         <StateInspector

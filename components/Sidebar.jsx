@@ -41,6 +41,21 @@ export default function Sidebar({
           </div>
         </div>
 
+        {/* User Greeting Banner */}
+        {currentUser && (
+          <div className="mx-0.5 mb-3 px-3 py-2 rounded-xl bg-slate-100/90 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 flex items-center gap-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0"></span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider leading-none">
+                Account Active
+              </p>
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate mt-0.5">
+                {currentUser.full_name || currentUser.email.split("@")[0]}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* New Chat Primary Button */}
         <button
           onClick={createNewChat}
@@ -135,29 +150,42 @@ export default function Sidebar({
         </div>
 
         {/* User Account / Authentication Card */}
-        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 px-2">
+        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 px-1">
           {currentUser ? (
-            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs uppercase flex-shrink-0">
-                  {(currentUser.full_name || currentUser.email || "U")[0]}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-                    {currentUser.full_name || currentUser.email.split("@")[0]}
-                  </p>
-                  <span className="text-[10px] text-emerald-700 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-950/80 px-1.5 py-0.5 rounded font-medium border border-transparent dark:border-emerald-800">
-                    {currentUser.role}
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shadow-xs">
+              <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-200/60 dark:border-slate-700/60">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
+                    My Account
                   </span>
                 </div>
+                <button
+                  onClick={handleLogout}
+                  className="px-2 py-0.5 text-slate-400 hover:text-red-500 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-md transition cursor-pointer flex items-center gap-1 text-[11px] font-medium"
+                  title="Sign Out of this account"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Logout</span>
+                </button>
               </div>
-              <button
-                onClick={handleLogout}
-                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-lg transition cursor-pointer"
-                title="Sign Out"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs uppercase flex-shrink-0 shadow-xs ring-2 ring-emerald-500/20">
+                  {(currentUser.full_name || currentUser.email || "U")[0]}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate" title={currentUser.full_name || currentUser.email}>
+                    {currentUser.full_name || currentUser.email.split("@")[0]}
+                  </p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate" title={currentUser.email}>
+                    {currentUser.email}
+                  </p>
+                </div>
+                <span className="text-[9px] uppercase font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 flex-shrink-0">
+                  {currentUser.role || "user"}
+                </span>
+              </div>
             </div>
           ) : (
             <button
