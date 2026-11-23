@@ -3,13 +3,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   Activity,
+  AlertCircle,
   Box,
   BrainCircuit,
   Check,
+  CheckCircle2,
   Copy,
   Database,
   ExternalLink,
+  FileText,
   Layers,
+  Loader2,
   Lock,
   LogIn,
   LogOut,
@@ -17,6 +21,7 @@ import {
   MessageSquare,
   Mic,
   MicOff,
+  Paperclip,
   Plus,
   RotateCcw,
   Send,
@@ -24,6 +29,7 @@ import {
   Sliders,
   Terminal,
   Trash2,
+  UploadCloud,
   User,
   X,
 } from "lucide-react";
@@ -92,6 +98,13 @@ export default function AdminChatPage() {
   const [kbTitle, setKbTitle] = useState("");
   const [kbCat, setKbCat] = useState("");
   const [kbText, setKbText] = useState("");
+
+  // Document Upload States
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [uploadToast, setUploadToast] = useState(null); // { type: 'success' | 'error' | 'loading', message: string }
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef(null);
+  const kbFileInputRef = useRef(null);
 
   const chatContainerRef = useRef(null);
 
@@ -744,6 +757,79 @@ export default function AdminChatPage() {
     }
   }
 
+  // Handle Document Upload (PDF, TXT, CSV, MD, JSON) into ChromaDB
+  async function handleFileUpload(file) {
+    if (!file) return;
+
+    const supportedExts = [".pdf", ".txt", ".md", ".csv", ".json"];
+    const fileExt = "." + file.name.split(".").pop().toLowerCase();
+    if (!supportedExts.includes(fileExt)) {
+      setUploadToast({
+        type: "error",
+        message: `Unsupported file type (${fileExt}). Please upload .pdf, .txt, .md, .csv, or .json.`,
+      });
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      setUploadToast({
+        type: "error",
+        message: "File exceeds 15MB maximum size limit.",
+      });
+      return;
+    }
+
+    setIsUploadingFile(true);
+    setUploadToast({
+      type: "loading",
+      message: `Uploading & indexing "${file.name}" into ChromaDB...`,
+    });
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("category", "user_documents");
+
+      const res = await authFetch(`${BACKEND_BASE}/knowledge/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to upload document.");
+      }
+
+      setUploadToast({
+        type: "success",
+        message: `Indexed "${data.filename}" (${data.total_chunks} chunks stored in ChromaDB)!`,
+      });
+
+      // Append confirmation system message to the chat
+      const confirmationMsg = {
+        id: `sys-${Date.now()}`,
+        text: `📄 **Document Uploaded:** *${data.filename}* (${data.total_chunks} chunk(s) indexed into ChromaDB vector store). You can now ask questions about this document!`,
+        isUser: false,
+        index: messages.length,
+      };
+      setMessages((prev) => [...prev, confirmationMsg]);
+
+      // If KB modal is open or loaded, refresh document list
+      loadKnowledgeDocuments();
+
+      setTimeout(() => {
+        setUploadToast(null);
+      }, 5000);
+    } catch (err) {
+      setUploadToast({
+        type: "error",
+        message: err.message || "Failed to process document upload.",
+      });
+    } finally {
+      setIsUploadingFile(false);
+    }
+  }
+
   const intentName = currentState?.nlu?.intent?.intent || "greeting";
   const intentConf = Math.round(
     (currentState?.nlu?.intent?.confidence || 0) * 100
@@ -1091,8 +1177,41 @@ export default function AdminChatPage() {
               </button>
             </div>
 
-            {/* Chat Input Form with Voice Dictation */}
+            {/* Chat Input Form with Voice Dictation & Document Upload */}
             <div className="p-4 bg-white border-t border-slate-200">
+              {/* Document Upload Status Toast */}
+              {uploadToast && (
+                <div
+                  className={`mb-3 px-3.5 py-2.5 rounded-xl text-xs flex items-center justify-between transition animate-in fade-in duration-150 ${
+                    uploadToast.type === "success"
+                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                      : uploadToast.type === "loading"
+                      ? "bg-blue-50 text-blue-800 border border-blue-200"
+                      : "bg-red-50 text-red-800 border border-red-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {uploadToast.type === "success" ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    ) : uploadToast.type === "loading" ? (
+                      <Loader2 className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                    )}
+                    <span className="font-medium">{uploadToast.message}</span>
+                  </div>
+                  {uploadToast.type !== "loading" && (
+                    <button
+                      type="button"
+                      onClick={() => setUploadToast(null)}
+                      className="p-1 hover:bg-black/5 rounded cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              )}
+
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -1100,6 +1219,33 @@ export default function AdminChatPage() {
                 }}
                 className="flex items-center gap-2.5"
               >
+                {/* Paperclip Document Upload Button */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingFile}
+                  className="p-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 hover:text-emerald-700 rounded-xl transition cursor-pointer flex items-center justify-center flex-shrink-0 disabled:opacity-50"
+                  title="Upload Document (PDF, TXT, CSV, MD, JSON) for RAG"
+                >
+                  {isUploadingFile ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                  ) : (
+                    <Paperclip className="w-4 h-4" />
+                  )}
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".pdf,.txt,.md,.csv,.json"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) {
+                      handleFileUpload(e.target.files[0]);
+                      e.target.value = "";
+                    }
+                  }}
+                  className="hidden"
+                />
+
                 <div className="relative flex-1 flex items-center">
                   <input
                     type="text"
@@ -1246,6 +1392,66 @@ export default function AdminChatPage() {
 
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
+              {/* Drag & Drop File Upload Zone */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  if (e.dataTransfer.files?.[0]) {
+                    handleFileUpload(e.dataTransfer.files[0]);
+                  }
+                }}
+                onClick={() => kbFileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition ${
+                  isDragging
+                    ? "border-emerald-500 bg-emerald-50/60"
+                    : "border-slate-300 hover:border-emerald-400 bg-slate-50/70 hover:bg-emerald-50/20"
+                }`}
+              >
+                <input
+                  type="file"
+                  ref={kbFileInputRef}
+                  accept=".pdf,.txt,.md,.csv,.json"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) {
+                      handleFileUpload(e.target.files[0]);
+                      e.target.value = "";
+                    }
+                  }}
+                  className="hidden"
+                />
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                    {isUploadingFile ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
+                    ) : (
+                      <UploadCloud className="w-5 h-5" />
+                    )}
+                  </div>
+                  <p className="text-xs font-semibold text-slate-800">
+                    {isUploadingFile
+                      ? "Extracting & indexing document into ChromaDB..."
+                      : "Drag & drop document here or click to browse"}
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Supports <b>PDF, TXT, Markdown (.md), CSV, JSON</b> (up to 15MB)
+                  </p>
+                </div>
+              </div>
+
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-slate-200"></div>
+                <span className="flex-shrink mx-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  or enter text manually
+                </span>
+                <div className="flex-grow border-t border-slate-200"></div>
+              </div>
+
               {/* Add Document Form */}
               <form
                 onSubmit={handleAddKnowledge}
