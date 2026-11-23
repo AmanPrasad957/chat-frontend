@@ -67,6 +67,8 @@ export default function ChatArea({
   setUploadToast,
   isListening,
   toggleSpeechRecognition,
+  speechLang,
+  toggleSpeechLang,
   children,
 }) {
   return (
@@ -136,6 +138,16 @@ export default function ChatArea({
           >
             <Volume2 className="w-3.5 h-3.5 text-slate-500" />
             <span>{speechRate}x</span>
+          </button>
+
+          {/* Bilingual Speech Language Toggle (English / Hindi) */}
+          <button
+            onClick={toggleSpeechLang}
+            className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            title={`Speech Language: ${speechLang === "hi-IN" ? "Hindi (हिन्दी)" : "English (EN)"} - Click to switch`}
+          >
+            <span className="text-sm leading-none">{speechLang === "hi-IN" ? "🇮🇳" : "🇬🇧"}</span>
+            <span className="font-medium">{speechLang === "hi-IN" ? "हिन्दी" : "English"}</span>
           </button>
 
           {/* Sleek Theme Toggle Button */}
@@ -490,6 +502,17 @@ export default function ChatArea({
                 className="hidden"
               />
 
+              {/* Language Selector Pill (Hindi / English) */}
+              <button
+                type="button"
+                onClick={toggleSpeechLang}
+                className="px-2.5 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 active:bg-slate-300 dark:active:bg-slate-650 text-slate-700 dark:text-slate-200 rounded-xl transition cursor-pointer flex items-center gap-1.5 flex-shrink-0 text-xs font-semibold border border-slate-200 dark:border-slate-700 shadow-xs"
+                title={`Speech Language: ${speechLang === "hi-IN" ? "Hindi (हिन्दी)" : "English (EN)"} - Click to switch`}
+              >
+                <span>{speechLang === "hi-IN" ? "🇮🇳" : "🇬🇧"}</span>
+                <span className="font-bold text-[11px]">{speechLang === "hi-IN" ? "हिन्दी" : "EN"}</span>
+              </button>
+
               <div className="relative flex-1 flex items-center">
                 <input
                   type="text"
@@ -497,8 +520,12 @@ export default function ChatArea({
                   onChange={(e) => setInputVal(e.target.value)}
                   placeholder={
                     isListening
-                      ? "Listening... Speak into your microphone"
-                      : "Type your message or click the mic to speak..."
+                      ? speechLang === "hi-IN"
+                        ? "सुन रहा हूँ... बोलिए (हिंदी)..."
+                        : "Listening... Speak in English..."
+                      : speechLang === "hi-IN"
+                      ? "हिंदी या English में टाइप करें या माइक पर बोलें..."
+                      : "Type in English or हिंदी, or click the mic to speak..."
                   }
                   className={`w-full bg-white dark:bg-slate-850 border text-sm rounded-xl pl-4 pr-11 py-3 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition ${
                     isListening
@@ -518,7 +545,7 @@ export default function ChatArea({
                   title={
                     isListening
                       ? "Listening... Click to stop voice dictation"
-                      : "Voice Input (Speech-to-Text)"
+                      : `Voice Input (${speechLang === "hi-IN" ? "Hindi" : "English"})`
                   }
                 >
                   {isListening ? (
@@ -540,12 +567,22 @@ export default function ChatArea({
 
             {/* Real-time Listening Status Indicator */}
             {isListening && (
-              <div className="mt-2.5 flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 font-medium px-1 animate-pulse">
-                <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                <span>
-                  Microphone active &bull; Listening to your voice... Speak
-                  clearly
-                </span>
+              <div className="mt-2.5 flex items-center justify-between text-xs text-rose-600 dark:text-rose-400 font-medium px-1">
+                <div className="flex items-center gap-2 animate-pulse">
+                  <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                  <span>
+                    {speechLang === "hi-IN"
+                      ? "माइक चालू है • हिंदी (Hindi) में बोलिए..."
+                      : "Microphone active • Listening in English... Speak clearly"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleSpeechLang}
+                  className="text-[11px] text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 underline cursor-pointer"
+                >
+                  Switch to {speechLang === "hi-IN" ? "English" : "हिन्दी"}
+                </button>
               </div>
             )}
           </div>

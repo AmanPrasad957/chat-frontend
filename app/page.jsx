@@ -145,6 +145,40 @@ export default function AdminChatPage() {
     }
   }, []);
 
+  // Bilingual Speech Language State: "en-IN" (English) or "hi-IN" (Hindi)
+  const [speechLang, setSpeechLang] = useState("en-IN");
+  const speechLangRef = useRef("en-IN");
+
+  useEffect(() => {
+    speechLangRef.current = speechLang;
+  }, [speechLang]);
+
+  useEffect(() => {
+    const savedLang = localStorage.getItem("chat_speech_lang");
+    if (savedLang === "hi-IN" || savedLang === "en-IN") {
+      setSpeechLang(savedLang);
+    }
+  }, []);
+
+  function toggleSpeechLang(newLang) {
+    const target = newLang || (speechLang === "en-IN" ? "hi-IN" : "en-IN");
+    setSpeechLang(target);
+    speechLangRef.current = target;
+    localStorage.setItem("chat_speech_lang", target);
+
+    // If currently listening, abort and restart with the new language
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {
+        console.warn("Failed to abort speech recognition:", e);
+      }
+      setTimeout(() => {
+        toggleSpeechRecognition();
+      }, 100);
+    }
+  }
+
   function toggleAutoTts() {
     const next = !isAutoTtsEnabled;
     setIsAutoTtsEnabled(next);
@@ -189,20 +223,42 @@ export default function AdminChatPage() {
     utterance.rate = speechRateRef.current || 1.0;
     utterance.pitch = 1.0;
 
-    const voices = window.speechSynthesis.getVoices();
-    const naturalVoice = voices.find(
-      (v) =>
-        v.lang.startsWith("en") &&
-        (v.name.includes("Natural") ||
-          v.name.includes("Google") ||
-          v.name.includes("Samantha") ||
-          v.name.includes("Daniel") ||
-          v.name.includes("Karen") ||
-          v.name.includes("Microsoft"))
-    ) || voices.find((v) => v.lang.startsWith("en"));
+    // Detect if text is Hindi (Devanagari Unicode) or if active language is Hindi
+    const isHindiText =
+      speechLangRef.current === "hi-IN" || /[\u0900-\u097F]/.test(cleanText);
+    utterance.lang = isHindiText ? "hi-IN" : "en-IN";
 
-    if (naturalVoice) {
-      utterance.voice = naturalVoice;
+    const voices = window.speechSynthesis.getVoices();
+    if (isHindiText) {
+      const hindiVoice = voices.find(
+        (v) =>
+          v.lang.startsWith("hi") ||
+          v.name.includes("Hindi") ||
+          v.name.includes("हिन्दी") ||
+          v.name.includes("Lekha") ||
+          v.name.includes("Kalpana") ||
+          v.name.includes("Hemant")
+      );
+      if (hindiVoice) {
+        utterance.voice = hindiVoice;
+      }
+    } else {
+      const naturalVoice = voices.find(
+        (v) =>
+          v.lang.includes("en-IN") ||
+          v.name.includes("India") ||
+          (v.lang.startsWith("en") &&
+            (v.name.includes("Natural") ||
+              v.name.includes("Google") ||
+              v.name.includes("Samantha") ||
+              v.name.includes("Daniel") ||
+              v.name.includes("Karen") ||
+              v.name.includes("Microsoft")))
+      ) || voices.find((v) => v.lang.startsWith("en"));
+
+      if (naturalVoice) {
+        utterance.voice = naturalVoice;
+      }
     }
 
     utterance.onstart = () => {
@@ -515,7 +571,7 @@ export default function AdminChatPage() {
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
-      recognition.lang = "en-US";
+      recognition.lang = speechLangRef.current || "en-IN";
 
       baseInputRef.current = inputVal ? inputVal.trim() + " " : "";
 
@@ -855,6 +911,8 @@ export default function AdminChatPage() {
         setUploadToast={setUploadToast}
         isListening={isListening}
         toggleSpeechRecognition={toggleSpeechRecognition}
+        speechLang={speechLang}
+        toggleSpeechLang={toggleSpeechLang}
         openAuthModal={() => {
           setAuthTab("login");
           setAuthError(null);
