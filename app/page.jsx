@@ -4,10 +4,12 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Activity,
   AlertCircle,
+  Bot,
   Box,
   BrainCircuit,
   Check,
   CheckCircle2,
+  Code2,
   Copy,
   Database,
   ExternalLink,
@@ -29,6 +31,7 @@ import {
   Send,
   ShieldCheck,
   Sliders,
+  Sparkles,
   Sun,
   Terminal,
   Trash2,
@@ -82,6 +85,8 @@ export default function AdminChatPage() {
   const [isTyping, setIsTyping] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isStateInspectorOpen, setIsStateInspectorOpen] = useState(false);
+  const [copiedMsgId, setCopiedMsgId] = useState(null);
 
   // Authentication & User Account States
   const [currentUser, setCurrentUser] = useState(null);
@@ -876,6 +881,15 @@ export default function AdminChatPage() {
     });
   }
 
+  // Copy assistant message text to clipboard
+  function copyMessageText(msgId, text) {
+    const clean = (text || "").replace(/<[^>]*>?/gm, "").trim();
+    navigator.clipboard.writeText(clean).then(() => {
+      setCopiedMsgId(msgId);
+      setTimeout(() => setCopiedMsgId(null), 1800);
+    });
+  }
+
   // ChromaDB Knowledge Base Modal methods
   async function openKnowledgeModal() {
     setIsKbOpen(true);
@@ -1020,82 +1034,74 @@ export default function AdminChatPage() {
   return (
     <div className="min-h-screen flex flex-col md:flex-row antialiased bg-[#f8fafc] dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors duration-200">
       {/* ================= LEFT SIDEBAR ================= */}
-      <aside className="w-full md:w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex-shrink-0 flex flex-col justify-between py-6 px-4 transition-colors duration-200">
-        <div>
+      <aside className="w-full md:w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex-shrink-0 flex flex-col justify-between py-5 px-4 transition-colors duration-200 md:h-screen md:sticky md:top-0">
+        <div className="flex-1 flex flex-col min-h-0">
           {/* Brand Logo & Name */}
-          <div className="flex items-center gap-3 px-3 mb-6">
-            <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold">
-              <Activity className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+          <div className="flex items-center gap-3 px-2 mb-5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 flex-shrink-0">
+              <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-emerald-800 dark:text-emerald-400">
-              Admin Panel
-            </span>
+            <div className="min-w-0">
+              <span className="text-sm font-bold tracking-tight text-slate-900 dark:text-slate-100 block leading-tight truncate">
+                Gemini AI RAG
+              </span>
+              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">
+                Conversational Agent
+              </span>
+            </div>
           </div>
 
-          {/* Navigation */}
-          <nav className="space-y-1 mb-6">
-            <a
-              href="#intents"
-              className="flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 transition font-medium text-sm"
-            >
-              <BrainCircuit className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              Intents
-            </a>
-            <a
-              href="#entities"
-              className="flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 transition font-medium text-sm"
-            >
-              <Box className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              Entities
-            </a>
-            <a
-              href="#chat"
-              className="flex items-center gap-3.5 px-3 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 font-semibold text-sm shadow-sm"
-            >
-              <MessageSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              Chat
-            </a>
-            <a
-              href="#logs"
-              className="flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 transition font-medium text-sm"
-            >
-              <Terminal className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              Logs
-            </a>
-          </nav>
+          {/* New Chat Primary Button */}
+          <button
+            onClick={createNewChat}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-3.5 mb-3 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white font-medium text-xs shadow-sm transition cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Chat</span>
+          </button>
 
-          {/* Active Conversations Section with Delete Controls */}
-          <div className="mb-6">
-            <div className="px-3 mb-2 flex items-center justify-between">
-              <span className="text-xs font-semibold tracking-wider text-emerald-700/80 uppercase">
-                Active Chats
-              </span>
-              <button
-                onClick={createNewChat}
-                className="text-[11px] text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-300 font-semibold flex items-center gap-1 hover:underline cursor-pointer"
-                title="Create a new chat conversation"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                New Chat
-              </button>
+          {/* Knowledge Base RAG Trigger */}
+          <button
+            onClick={openKnowledgeModal}
+            className="w-full mb-4 flex items-center justify-between px-3 py-2 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition font-medium text-xs border border-slate-200/80 dark:border-slate-800 cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5">
+              <Database className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Knowledge Base</span>
             </div>
-            <div className="space-y-1 max-h-36 overflow-y-auto custom-scrollbar px-1">
+            <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800">
+              {kbDocs.length > 0 ? `${kbDocs.length} Docs` : "RAG"}
+            </span>
+          </button>
+
+          {/* Active Conversations Section */}
+          <div className="flex-1 flex flex-col min-h-0 mb-3">
+            <div className="px-2 mb-2 flex items-center justify-between">
+              <span className="text-[11px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
+                Conversations
+              </span>
+              <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+                {activeThreads.length}
+              </span>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar pr-1">
               {activeThreads.map((t) => {
                 const isActive = t.thread_id === currentThreadId;
                 return (
                   <div
                     key={t.thread_id}
-                    className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition ${
+                    className={`group flex items-center justify-between px-2.5 py-2 rounded-xl text-xs cursor-pointer transition ${
                       isActive
-                        ? "bg-emerald-100/70 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 font-semibold"
-                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 font-semibold border border-emerald-200/80 dark:border-emerald-800/60"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200"
                     }`}
                   >
                     <div
-                      className="truncate flex-1 pr-1.5"
+                      className="truncate flex-1 pr-2 flex items-center gap-2"
                       onClick={() => switchChat(t.thread_id)}
                     >
-                      {t.title || t.thread_id}
+                      <MessageSquare className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`} />
+                      <span className="truncate">{t.title || t.thread_id}</span>
                     </div>
                     <button
                       onClick={(e) => deleteParticularChat(t.thread_id, e)}
@@ -1109,119 +1115,103 @@ export default function AdminChatPage() {
               })}
             </div>
           </div>
+        </div>
 
-          {/* Settings Section */}
-          <div className="px-3 mb-2 text-xs font-semibold tracking-wider text-emerald-700/80 dark:text-emerald-400 uppercase">
-            Settings
-          </div>
-          <nav className="space-y-1">
-            <a
-              href="#ml"
-              className="flex items-center gap-3.5 px-3 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 transition font-medium text-sm"
-            >
-              <Sliders className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              ML Settings
-            </a>
-
-            <button
-              onClick={openKnowledgeModal}
-              className="w-full text-left flex items-center gap-3.5 px-3 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 transition font-medium text-sm cursor-pointer"
-            >
-              <Database className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              Data Management
-              <span className="ml-auto text-[10px] bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold px-1.5 py-0.5 rounded border border-transparent dark:border-blue-800">
-                RAG
+        <div>
+          {/* Provider & Status Badges */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 px-2 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+              <span className="font-medium">Backend Engine</span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-semibold uppercase text-[10px] border border-transparent dark:border-emerald-800">
+                Gemini 2.0
               </span>
-            </button>
-
-            <a
-              href="#integrations"
-              className="flex items-center gap-3.5 px-3 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 transition font-medium text-sm"
-            >
-              <Layers className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              Integrations
-            </a>
-          </nav>
-        </div>
-
-        {/* Provider & Status Badges */}
-        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 px-3 space-y-2">
-          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-            <span className="font-medium">Backend Engine</span>
-            <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-semibold uppercase text-[10px] border border-transparent dark:border-emerald-800">
-              Google Gemini
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-            <span className="font-medium">Vector Store</span>
-            <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-semibold uppercase text-[10px] border border-transparent dark:border-blue-800">
-              ChromaDB
-            </span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 font-medium pt-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Live at :8000</span>
-          </div>
-        </div>
-
-        {/* User Account / Authentication Card */}
-        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 px-3">
-          {currentUser ? (
-            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs uppercase flex-shrink-0">
-                  {(currentUser.full_name || currentUser.email || "U")[0]}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-                    {currentUser.full_name || currentUser.email.split("@")[0]}
-                  </p>
-                  <span className="text-[10px] text-emerald-700 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-950/80 px-1.5 py-0.5 rounded font-medium border border-transparent dark:border-emerald-800">
-                    {currentUser.role}
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-lg transition cursor-pointer"
-                title="Sign Out"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
             </div>
-          ) : (
-            <button
-              onClick={() => {
-                setAuthError(null);
-                setIsAuthModalOpen(true);
-              }}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
-            >
-              <LogIn className="w-4 h-4" />
-              <span>Sign In / Register</span>
-            </button>
-          )}
+            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+              <span className="font-medium">Vector Store</span>
+              <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-semibold uppercase text-[10px] border border-transparent dark:border-blue-800">
+                ChromaDB
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium pt-0.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>FastAPI Connected</span>
+            </div>
+          </div>
+
+          {/* User Account / Authentication Card */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 px-2">
+            {currentUser ? (
+              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs uppercase flex-shrink-0">
+                    {(currentUser.full_name || currentUser.email || "U")[0]}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                      {currentUser.full_name || currentUser.email.split("@")[0]}
+                    </p>
+                    <span className="text-[10px] text-emerald-700 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-950/80 px-1.5 py-0.5 rounded font-medium border border-transparent dark:border-emerald-800">
+                      {currentUser.role}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-lg transition cursor-pointer"
+                  title="Sign Out"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setAuthError(null);
+                  setIsAuthModalOpen(true);
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Sign In / Register</span>
+              </button>
+            )}
+          </div>
         </div>
       </aside>
 
       {/* ================= MAIN WORKSPACE AREA ================= */}
-      <main className="flex-1 flex flex-col p-6 md:p-8 overflow-y-auto">
+      <main className="flex-1 flex flex-col p-4 md:p-6 lg:p-8 overflow-y-auto">
         {/* Top Header */}
-        <header className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <header className="mb-4 md:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-                Chat Interface
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 truncate max-w-md">
+                {activeThreads.find((t) => t.thread_id === currentThreadId)?.title || "Chat Interface"}
               </h1>
-              <span className="px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-mono font-medium">
-                {currentThreadId}
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-[11px] font-semibold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Gemini 2.0 Flash
               </span>
             </div>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-              Test your chatbot&apos;s responses in real-time
+            <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 font-mono">
+              Thread: {currentThreadId}
             </p>
           </div>
-          <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* State Inspector Toggle Button */}
+            <button
+              onClick={() => setIsStateInspectorOpen(!isStateInspectorOpen)}
+              className={`px-3 py-1.5 rounded-lg border text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer ${
+                isStateInspectorOpen
+                  ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"
+                  : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+              }`}
+              title="Toggle State Inspector drawer"
+            >
+              <Code2 className="w-3.5 h-3.5" />
+              <span>{isStateInspectorOpen ? "Hide Inspector" : "{ } Inspect State"}</span>
+            </button>
+
             {/* Auto-Speak / Hands-Free Voice Button */}
             <button
               onClick={toggleAutoTts}
@@ -1277,7 +1267,7 @@ export default function AdminChatPage() {
               title="Delete this particular chat"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              Delete Chat
+              <span className="hidden sm:inline">Delete Chat</span>
             </button>
 
             {/* Reset Chat Button */}
@@ -1287,7 +1277,7 @@ export default function AdminChatPage() {
               title="Reset this conversation"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              Reset Session
+              <span className="hidden sm:inline">Reset</span>
             </button>
 
             <a
@@ -1302,97 +1292,150 @@ export default function AdminChatPage() {
           </div>
         </header>
 
-        {/* Two Column Grid: Left Chat Panel & Right State Inspector */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-start">
+        {/* Content Area: Main Chat + Collapsible Inspector */}
+        <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0 items-start">
           {/* ================= MIDDLE CHAT INTERFACE ================= */}
-          <section className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm flex flex-col h-[700px] overflow-hidden transition-colors duration-200">
+          <section className="flex-1 w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm flex flex-col h-[calc(100vh-140px)] min-h-[620px] overflow-hidden transition-colors duration-200">
             {/* Conversation Stream */}
             <div
               ref={chatContainerRef}
-              className="flex-1 p-6 overflow-y-auto space-y-4 custom-scrollbar"
+              className="flex-1 p-4 md:p-6 overflow-y-auto space-y-5 custom-scrollbar"
             >
-              {messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={`message-group relative flex items-center gap-2 max-w-[85%] ${
-                    m.isUser ? "justify-end ml-auto" : "justify-start"
-                  }`}
-                >
-                  {m.isUser && (
-                    <button
-                      onClick={() => deleteParticularMessage(m)}
-                      className="msg-delete-btn opacity-0 transition p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                      title="Delete this message"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+              <div className="max-w-3xl mx-auto w-full space-y-5">
+                {messages.map((m) => (
+                  <div key={m.id} className="w-full">
+                    {m.isUser ? (
+                      /* User Message Bubble */
+                      <div className="flex items-start justify-end gap-3 max-w-[85%] ml-auto group">
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition self-center">
+                          <button
+                            onClick={() => deleteParticularMessage(m)}
+                            className="p-1.5 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                            title="Delete this message"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <div
+                            className="bg-emerald-600 text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-sm leading-relaxed shadow-sm selection:bg-emerald-700"
+                            dangerouslySetInnerHTML={{ __html: m.text }}
+                          />
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-200 flex-shrink-0 uppercase shadow-xs">
+                          {(currentUser?.full_name || currentUser?.email || "U")[0]}
+                        </div>
+                      </div>
+                    ) : (
+                      /* Assistant Message Bubble */
+                      <div className="flex items-start justify-start gap-3 max-w-[88%] mr-auto group">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white flex-shrink-0 shadow-sm mt-0.5">
+                          <Sparkles className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0 flex flex-col">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                              Gemini Assistant
+                            </span>
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.2 rounded font-mono font-medium">
+                              AI
+                            </span>
+                          </div>
+                          <div
+                            className="bg-slate-100/90 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 text-sm px-4 py-3 rounded-2xl rounded-tl-sm leading-relaxed shadow-xs"
+                            dangerouslySetInnerHTML={{ __html: m.text }}
+                          />
+                          {/* Actions: Copy, Listen, Delete */}
+                          <div className="flex items-center gap-2 mt-1.5 opacity-70 group-hover:opacity-100 transition text-slate-400 dark:text-slate-500 pl-1">
+                            <button
+                              onClick={() => copyMessageText(m.id, m.text)}
+                              className="hover:text-slate-800 dark:hover:text-slate-200 transition cursor-pointer flex items-center gap-1 text-[11px]"
+                              title="Copy message"
+                            >
+                              {copiedMsgId === m.id ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
 
-                  <div
-                    className={
-                      m.isUser
-                        ? "bg-blue-600 text-white text-sm px-4 py-2.5 rounded-2xl rounded-tr-sm leading-relaxed shadow-sm"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm px-4 py-2.5 rounded-2xl rounded-tl-sm leading-relaxed shadow-sm"
-                    }
-                    dangerouslySetInnerHTML={{ __html: m.text }}
-                  />
+                            <span className="text-slate-300 dark:text-slate-700">&bull;</span>
 
-                  {!m.isUser && (
-                    <div className="flex items-center gap-0.5">
-                      {/* Read Aloud / Stop Audio Button */}
-                      <button
-                        onClick={() => speakMessage(m.text, m.id)}
-                        className={`transition p-1.5 rounded-md cursor-pointer ${
-                          speakingMsgId === m.id
-                            ? "opacity-100 text-emerald-600 dark:text-emerald-400 bg-emerald-100/70 dark:bg-emerald-950/70 animate-pulse"
-                            : "opacity-0 group-hover:opacity-100 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                        }`}
-                        title={
-                          speakingMsgId === m.id
-                            ? "Stop reading aloud"
-                            : "Read aloud (Text-to-Speech)"
-                        }
-                      >
-                        {speakingMsgId === m.id ? (
-                          <VolumeX className="w-3.5 h-3.5" />
-                        ) : (
-                          <Volume2 className="w-3.5 h-3.5" />
-                        )}
-                      </button>
+                            <button
+                              onClick={() => speakMessage(m.text, m.id)}
+                              className={`transition cursor-pointer flex items-center gap-1 text-[11px] ${
+                                speakingMsgId === m.id
+                                  ? "text-emerald-600 dark:text-emerald-400 font-medium animate-pulse"
+                                  : "hover:text-emerald-600 dark:hover:text-emerald-400"
+                              }`}
+                              title={
+                                speakingMsgId === m.id
+                                  ? "Stop reading aloud"
+                                  : "Read aloud (Text-to-Speech)"
+                              }
+                            >
+                              {speakingMsgId === m.id ? (
+                                <>
+                                  <VolumeX className="w-3.5 h-3.5" />
+                                  <span>Stop</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Volume2 className="w-3.5 h-3.5" />
+                                  <span>Listen</span>
+                                </>
+                              )}
+                            </button>
 
-                      <button
-                        onClick={() => deleteParticularMessage(m)}
-                        className="msg-delete-btn opacity-0 group-hover:opacity-100 transition p-1.5 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                        title="Delete this message"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                            <span className="text-slate-300 dark:text-slate-700">&bull;</span>
+
+                            <button
+                              onClick={() => deleteParticularMessage(m)}
+                              className="hover:text-red-500 transition cursor-pointer flex items-center gap-1 text-[11px]"
+                              title="Delete this message"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {/* Typing indicator */}
+                {isTyping && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white flex-shrink-0 shadow-sm">
+                      <Sparkles className="w-4 h-4 text-white" />
                     </div>
-                  )}
-                </div>
-              ))}
-
-              {/* Typing indicator */}
-              {isTyping && (
-                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-4 py-3 rounded-2xl rounded-tl-sm w-fit">
-                  <div
-                    className="w-2 h-2 rounded-full bg-slate-400 animate-bounce"
-                    style={{ animationDelay: "0ms" }}
-                  />
-                  <div
-                    className="w-2 h-2 rounded-full bg-slate-400 animate-bounce"
-                    style={{ animationDelay: "150ms" }}
-                  />
-                  <div
-                    className="w-2 h-2 rounded-full bg-slate-400 animate-bounce"
-                    style={{ animationDelay: "300ms" }}
-                  />
-                </div>
-              )}
+                    <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-4 py-3 rounded-2xl rounded-tl-sm w-fit">
+                      <div
+                        className="w-2 h-2 rounded-full bg-emerald-500 animate-bounce"
+                        style={{ animationDelay: "0ms" }}
+                      />
+                      <div
+                        className="w-2 h-2 rounded-full bg-emerald-500 animate-bounce"
+                        style={{ animationDelay: "150ms" }}
+                      />
+                      <div
+                        className="w-2 h-2 rounded-full bg-emerald-500 animate-bounce"
+                        style={{ animationDelay: "300ms" }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Quick Test Chips */}
-            <div className="px-5 py-2.5 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2">
+            <div className="px-5 py-2.5 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-center gap-2">
               <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                 Quick Prompts:
               </span>
@@ -1432,183 +1475,194 @@ export default function AdminChatPage() {
 
             {/* Chat Input Form with Voice Dictation & Document Upload */}
             <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 transition-colors duration-200">
-              {/* Document Upload Status Toast */}
-              {uploadToast && (
-                <div
-                  className={`mb-3 px-3.5 py-2.5 rounded-xl text-xs flex items-center justify-between transition animate-in fade-in duration-150 ${
-                    uploadToast.type === "success"
-                      ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800"
-                      : uploadToast.type === "loading"
-                      ? "bg-blue-50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800"
-                      : "bg-red-50 dark:bg-red-950/50 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {uploadToast.type === "success" ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                    ) : uploadToast.type === "loading" ? (
-                      <Loader2 className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin flex-shrink-0" />
-                    ) : (
-                      <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
-                    )}
-                    <span className="font-medium">{uploadToast.message}</span>
-                  </div>
-                  {uploadToast.type !== "loading" && (
-                    <button
-                      type="button"
-                      onClick={() => setUploadToast(null)}
-                      className="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded cursor-pointer"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              )}
-
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSend();
-                }}
-                className="flex items-center gap-2.5"
-              >
-                {/* Paperclip Document Upload Button */}
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploadingFile}
-                  className="p-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 active:bg-slate-300 dark:active:bg-slate-650 text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 rounded-xl transition cursor-pointer flex items-center justify-center flex-shrink-0 disabled:opacity-50"
-                  title="Upload Document (PDF, TXT, CSV, MD, JSON) for RAG"
-                >
-                  {isUploadingFile ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-emerald-600 dark:text-emerald-400" />
-                  ) : (
-                    <Paperclip className="w-4 h-4" />
-                  )}
-                </button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept=".pdf,.txt,.md,.csv,.json"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) {
-                      handleFileUpload(e.target.files[0]);
-                      e.target.value = "";
-                    }
-                  }}
-                  className="hidden"
-                />
-
-                <div className="relative flex-1 flex items-center">
-                  <input
-                    type="text"
-                    value={inputVal}
-                    onChange={(e) => setInputVal(e.target.value)}
-                    placeholder={
-                      isListening
-                        ? "Listening... Speak into your microphone"
-                        : "Type your message or click the mic to speak"
-                    }
-                    className={`w-full bg-white dark:bg-slate-850 border text-sm rounded-xl pl-4 pr-11 py-3 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition ${
-                      isListening
-                        ? "border-rose-400 ring-2 ring-rose-100 dark:ring-rose-950 placeholder-rose-400"
-                        : "border-slate-300 dark:border-slate-700 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-950/60"
+              <div className="max-w-3xl mx-auto w-full">
+                {/* Document Upload Status Toast */}
+                {uploadToast && (
+                  <div
+                    className={`mb-3 px-3.5 py-2.5 rounded-xl text-xs flex items-center justify-between transition animate-in fade-in duration-150 ${
+                      uploadToast.type === "success"
+                        ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800"
+                        : uploadToast.type === "loading"
+                        ? "bg-blue-50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800"
+                        : "bg-red-50 dark:bg-red-950/50 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800"
                     }`}
-                  />
-                  {/* Microphone dictation button */}
+                  >
+                    <div className="flex items-center gap-2">
+                      {uploadToast.type === "success" ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                      ) : uploadToast.type === "loading" ? (
+                        <Loader2 className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
+                      )}
+                      <span className="font-medium">{uploadToast.message}</span>
+                    </div>
+                    {uploadToast.type !== "loading" && (
+                      <button
+                        type="button"
+                        onClick={() => setUploadToast(null)}
+                        className="p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSend();
+                  }}
+                  className="flex items-center gap-2.5"
+                >
+                  {/* Paperclip Document Upload Button */}
                   <button
                     type="button"
-                    onClick={toggleSpeechRecognition}
-                    className={`absolute right-2 p-1.5 rounded-lg transition cursor-pointer flex items-center justify-center ${
-                      isListening
-                        ? "bg-rose-500 text-white shadow-sm shadow-rose-200 animate-pulse"
-                        : "text-slate-400 dark:text-slate-500 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    }`}
-                    title={
-                      isListening
-                        ? "Listening... Click to stop voice dictation"
-                        : "Voice Input (Speech-to-Text)"
-                    }
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingFile}
+                    className="p-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 active:bg-slate-300 dark:active:bg-slate-650 text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 rounded-xl transition cursor-pointer flex items-center justify-center flex-shrink-0 disabled:opacity-50"
+                    title="Upload Document (PDF, TXT, CSV, MD, JSON) for RAG"
                   >
-                    {isListening ? (
-                      <MicOff className="w-4 h-4" />
+                    {isUploadingFile ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-emerald-600 dark:text-emerald-400" />
                     ) : (
-                      <Mic className="w-4 h-4" />
+                      <Paperclip className="w-4 h-4" />
                     )}
                   </button>
-                </div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept=".pdf,.txt,.md,.csv,.json"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        handleFileUpload(e.target.files[0]);
+                        e.target.value = "";
+                      }
+                    }}
+                    className="hidden"
+                  />
 
-                <button
-                  type="submit"
-                  className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold text-sm px-6 py-3 rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer flex-shrink-0"
-                >
-                  <span>Send</span>
-                  <Send className="w-4 h-4" />
-                </button>
-              </form>
+                  <div className="relative flex-1 flex items-center">
+                    <input
+                      type="text"
+                      value={inputVal}
+                      onChange={(e) => setInputVal(e.target.value)}
+                      placeholder={
+                        isListening
+                          ? "Listening... Speak into your microphone"
+                          : "Type your message or click the mic to speak..."
+                      }
+                      className={`w-full bg-white dark:bg-slate-850 border text-sm rounded-xl pl-4 pr-11 py-3 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition ${
+                        isListening
+                          ? "border-rose-400 ring-2 ring-rose-100 dark:ring-rose-950 placeholder-rose-400"
+                          : "border-slate-300 dark:border-slate-700 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-950/60"
+                      }`}
+                    />
+                    {/* Microphone dictation button */}
+                    <button
+                      type="button"
+                      onClick={toggleSpeechRecognition}
+                      className={`absolute right-2 p-1.5 rounded-lg transition cursor-pointer flex items-center justify-center ${
+                        isListening
+                          ? "bg-rose-500 text-white shadow-sm shadow-rose-200 animate-pulse"
+                          : "text-slate-400 dark:text-slate-500 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      }`}
+                      title={
+                        isListening
+                          ? "Listening... Click to stop voice dictation"
+                          : "Voice Input (Speech-to-Text)"
+                      }
+                    >
+                      {isListening ? (
+                        <MicOff className="w-4 h-4" />
+                      ) : (
+                        <Mic className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
 
-              {/* Real-time Listening Status Indicator */}
-              {isListening && (
-                <div className="mt-2.5 flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 font-medium px-1 animate-pulse">
-                  <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                  <span>Microphone active &bull; Listening to your voice... Speak clearly</span>
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* ================= RIGHT COLUMN: CURRENT STATE ================= */}
-          <section className="lg:col-span-5 flex flex-col h-[700px]">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm flex-1 flex flex-col overflow-hidden transition-colors duration-200">
-              {/* State Header */}
-              <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-                    Current State
-                  </h2>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full border border-transparent dark:border-emerald-800">
-                    intent: {intentName} ({intentConf}%)
-                  </span>
                   <button
-                    onClick={copyStateJson}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                    title="Copy JSON state"
+                    type="submit"
+                    className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold text-sm px-6 py-3 rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer flex-shrink-0"
                   >
-                    {copied ? (
-                      <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    ) : (
-                      <Copy className="w-4 h-4" />
-                    )}
+                    <span>Send</span>
+                    <Send className="w-4 h-4" />
                   </button>
-                </div>
-              </div>
+                </form>
 
-              {/* JSON State Viewer */}
-              <div className="flex-1 p-5 overflow-auto custom-scrollbar bg-slate-50/70 dark:bg-slate-950/60 font-mono text-xs text-slate-800 dark:text-slate-200">
-                <pre className="whitespace-pre leading-relaxed select-text font-mono text-[12px] text-slate-800 dark:text-slate-200">
-                  {JSON.stringify(currentState, null, 2)}
-                </pre>
-              </div>
-
-              {/* Bottom Footer Details */}
-              <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 px-5">
-                <div>
-                  Thread:{" "}
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">
-                    {currentState?.thread_id || currentThreadId}
-                  </span>
-                </div>
-                <div>
-                  Channel:{" "}
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">rest</span>
-                </div>
+                {/* Real-time Listening Status Indicator */}
+                {isListening && (
+                  <div className="mt-2.5 flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 font-medium px-1 animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                    <span>Microphone active &bull; Listening to your voice... Speak clearly</span>
+                  </div>
+                )}
               </div>
             </div>
           </section>
+
+          {/* ================= STATE INSPECTOR DRAWER / PANEL ================= */}
+          {isStateInspectorOpen && (
+            <section className="w-full lg:w-[420px] flex-shrink-0 flex flex-col h-[calc(100vh-140px)] min-h-[620px] transition-all duration-200 animate-in slide-in-from-right-4">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm flex-1 flex flex-col overflow-hidden transition-colors duration-200">
+                {/* State Header */}
+                <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
+                  <div className="flex items-center gap-2.5">
+                    <Code2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                      State Inspector
+                    </h2>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full border border-transparent dark:border-emerald-800">
+                      {intentName} ({intentConf}%)
+                    </span>
+                    <button
+                      onClick={copyStateJson}
+                      className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                      title="Copy JSON state"
+                    >
+                      {copied ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setIsStateInspectorOpen(false)}
+                      className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                      title="Close Inspector"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* JSON State Viewer */}
+                <div className="flex-1 p-4 overflow-auto custom-scrollbar bg-slate-50/70 dark:bg-slate-950/60 font-mono text-xs text-slate-800 dark:text-slate-200">
+                  <pre className="whitespace-pre leading-relaxed select-text font-mono text-[11px] text-slate-800 dark:text-slate-200">
+                    {JSON.stringify(currentState, null, 2)}
+                  </pre>
+                </div>
+
+                {/* Bottom Footer Details */}
+                <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 px-5">
+                  <div>
+                    Thread:{" "}
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">
+                      {currentState?.thread_id || currentThreadId}
+                    </span>
+                  </div>
+                  <div>
+                    Channel:{" "}
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">rest</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
         </div>
       </main>
 
