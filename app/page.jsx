@@ -12,6 +12,7 @@ import {
   Database,
   ExternalLink,
   FileText,
+  Headphones,
   Layers,
   Loader2,
   Lock,
@@ -33,6 +34,8 @@ import {
   Trash2,
   UploadCloud,
   User,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 
@@ -136,6 +139,143 @@ export default function AdminChatPage() {
       document.documentElement.classList.remove("dark");
     }
   }
+
+  // Text-to-Speech (TTS) Audio States & Helpers
+  const [speakingMsgId, setSpeakingMsgId] = useState(null);
+  const [speechRate, setSpeechRate] = useState(1.0);
+  const [isAutoTtsEnabled, setIsAutoTtsEnabled] = useState(false);
+  const isAutoTtsEnabledRef = useRef(false);
+  const speechRateRef = useRef(1.0);
+
+  useEffect(() => {
+    isAutoTtsEnabledRef.current = isAutoTtsEnabled;
+  }, [isAutoTtsEnabled]);
+
+  useEffect(() => {
+    speechRateRef.current = speechRate;
+  }, [speechRate]);
+
+  // Load TTS preferences from localStorage
+  useEffect(() => {
+    const savedRate = localStorage.getItem("chat_tts_speed");
+    if (savedRate) {
+      const parsed = parseFloat(savedRate);
+      if (!isNaN(parsed) && parsed > 0) setSpeechRate(parsed);
+    }
+    const savedAuto = localStorage.getItem("chat_auto_tts");
+    if (savedAuto === "true") {
+      setIsAutoTtsEnabled(true);
+    }
+  }, []);
+
+  function toggleAutoTts() {
+    const next = !isAutoTtsEnabled;
+    setIsAutoTtsEnabled(next);
+    localStorage.setItem("chat_auto_tts", next ? "true" : "false");
+    if (!next) {
+      stopSpeaking();
+    }
+  }
+
+  function cycleSpeechRate() {
+    const rates = [1.0, 1.25, 1.5, 0.75];
+    const currentIndex = rates.indexOf(speechRate);
+    const nextRate = rates[(currentIndex + 1) % rates.length];
+    setSpeechRate(nextRate);
+    localStorage.setItem("chat_tts_speed", nextRate.toString());
+  }
+
+  function stripHtmlAndMarkdown(rawText) {
+    if (!rawText) return "";
+    let clean = rawText;
+    // Strip HTML tags
+    clean = clean.replace(/<[^>]*>/g, " ");
+    // Strip code blocks ```code```
+    clean = clean.replace(/```[\s\S]*?```/g, " code block omitted ");
+    // Strip inline code `code`
+    clean = clean.replace(/`([^`]+)`/g, "$1");
+    // Strip markdown links [label](url)
+    clean = clean.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+    // Strip bold/italics/headings/blockquotes
+    clean = clean.replace(/[*_~#]/g, "");
+    clean = clean.replace(/^>\s+/gm, "");
+    // Normalize spaces
+    clean = clean.replace(/\s+/g, " ").trim();
+    return clean;
+  }
+
+  function stopSpeaking() {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setSpeakingMsgId(null);
+  }
+
+  function speakMessage(text, msgId) {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      alert("Text-to-Speech is not supported in this browser.");
+      return;
+    }
+
+    // If already speaking this message, toggle off
+    if (speakingMsgId === msgId) {
+      stopSpeaking();
+      return;
+    }
+
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+
+    const cleanText = stripHtmlAndMarkdown(text);
+    if (!cleanText) return;
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = speechRateRef.current || 1.0;
+    utterance.pitch = 1.0;
+
+    // Pick a natural English voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const naturalVoice = voices.find(
+      (v) =>
+        v.lang.startsWith("en") &&
+        (v.name.includes("Natural") ||
+          v.name.includes("Google") ||
+          v.name.includes("Samantha") ||
+          v.name.includes("Daniel") ||
+          v.name.includes("Karen") ||
+          v.name.includes("Microsoft"))
+    ) || voices.find((v) => v.lang.startsWith("en"));
+
+    if (naturalVoice) {
+      utterance.voice = naturalVoice;
+    }
+
+    utterance.onstart = () => {
+      setSpeakingMsgId(msgId);
+    };
+
+    utterance.onend = () => {
+      setSpeakingMsgId(null);
+    };
+
+    utterance.onerror = (e) => {
+      if (e.error !== "interrupted" && e.error !== "canceled") {
+        console.warn("Speech synthesis error:", e);
+      }
+      setSpeakingMsgId(null);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  }
+
+  // Cancel speech on unmount
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   const chatContainerRef = useRef(null);
 
@@ -359,6 +499,7 @@ export default function AdminChatPage() {
 
   // Switch conversation thread
   async function switchChat(threadId) {
+    stopSpeaking();
     setCurrentThreadId(threadId);
     try {
       const res = await authFetch(`${BACKEND_BASE}/chat/state/${threadId}`);
@@ -465,6 +606,7 @@ export default function AdminChatPage() {
   // Delete an entire chat conversation
   async function deleteParticularChat(threadId, e) {
     if (e) e.stopPropagation();
+    stopSpeaking();
     try {
       await authFetch(`${BACKEND_BASE}/chat/threads/${threadId}`, {
         method: "DELETE",
@@ -487,6 +629,9 @@ export default function AdminChatPage() {
 
   // Delete an individual message
   async function deleteParticularMessage(msgObj) {
+    if (speakingMsgId === msgObj.id) {
+      stopSpeaking();
+    }
     if (msgObj.index !== null && msgObj.index !== undefined) {
       try {
         await authFetch(
@@ -502,6 +647,7 @@ export default function AdminChatPage() {
 
   // Reset current session
   async function resetSession() {
+    stopSpeaking();
     try {
       await authFetch(`${BACKEND_BASE}/chat/state/${currentThreadId}`, {
         method: "DELETE",
@@ -703,6 +849,11 @@ export default function AdminChatPage() {
       }
 
       setIsTyping(false);
+
+      // Auto-speak completed assistant response if enabled
+      if (isAutoTtsEnabledRef.current && accumulatedText.trim()) {
+        speakMessage(accumulatedText, botMsgId);
+      }
     } catch (err) {
       setIsTyping(false);
       setMessages((prev) => [
@@ -1070,7 +1221,41 @@ export default function AdminChatPage() {
               Test your chatbot&apos;s responses in real-time
             </p>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Auto-Speak / Hands-Free Voice Button */}
+            <button
+              onClick={toggleAutoTts}
+              className={`px-3 py-1.5 rounded-lg border text-xs font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer ${
+                isAutoTtsEnabled
+                  ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"
+                  : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+              }`}
+              title={
+                isAutoTtsEnabled
+                  ? "Auto-Speak enabled: bot speaks responses automatically (click to turn OFF)"
+                  : "Auto-Speak disabled: click to automatically read out bot responses"
+              }
+            >
+              <Headphones
+                className={`w-3.5 h-3.5 ${
+                  isAutoTtsEnabled
+                    ? "text-emerald-600 dark:text-emerald-400 animate-pulse"
+                    : "text-slate-400"
+                }`}
+              />
+              <span>Auto-Speak: {isAutoTtsEnabled ? "ON" : "OFF"}</span>
+            </button>
+
+            {/* Voice Speed Cycle Button */}
+            <button
+              onClick={cycleSpeechRate}
+              className="px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-mono font-semibold shadow-xs transition flex items-center gap-1 cursor-pointer"
+              title="Click to cycle voice playback speed (1x, 1.25x, 1.5x, 0.75x)"
+            >
+              <Volume2 className="w-3.5 h-3.5 text-slate-500" />
+              <span>{speechRate}x</span>
+            </button>
+
             {/* Sleek Theme Toggle Button */}
             <button
               onClick={toggleTheme}
@@ -1153,13 +1338,36 @@ export default function AdminChatPage() {
                   />
 
                   {!m.isUser && (
-                    <button
-                      onClick={() => deleteParticularMessage(m)}
-                      className="msg-delete-btn opacity-0 transition p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                      title="Delete this message"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-0.5">
+                      {/* Read Aloud / Stop Audio Button */}
+                      <button
+                        onClick={() => speakMessage(m.text, m.id)}
+                        className={`transition p-1.5 rounded-md cursor-pointer ${
+                          speakingMsgId === m.id
+                            ? "opacity-100 text-emerald-600 dark:text-emerald-400 bg-emerald-100/70 dark:bg-emerald-950/70 animate-pulse"
+                            : "opacity-0 group-hover:opacity-100 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        }`}
+                        title={
+                          speakingMsgId === m.id
+                            ? "Stop reading aloud"
+                            : "Read aloud (Text-to-Speech)"
+                        }
+                      >
+                        {speakingMsgId === m.id ? (
+                          <VolumeX className="w-3.5 h-3.5" />
+                        ) : (
+                          <Volume2 className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => deleteParticularMessage(m)}
+                        className="msg-delete-btn opacity-0 group-hover:opacity-100 transition p-1.5 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                        title="Delete this message"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}
